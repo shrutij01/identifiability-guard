@@ -3,7 +3,12 @@
 import numpy as np
 import pytest
 
-from src.dgp import D1Independent, D2Correlated, D3SingleRedundant, D4MultiRedundant
+from src.dgp import (
+    D1Independent, 
+    D2Correlated, 
+    D3SingleRedundant, 
+    D4MultiRedundant,
+)
 
 
 class TestD1Independent:
@@ -100,7 +105,7 @@ class TestD3SingleRedundant:
     
     def test_redundancy(self):
         """Test that Z[:, 1] = f(Z[:, 0])."""
-        dgp = D3SingleRedundant(d=3, redundant_fn=lambda x: x**2, seed=42)
+        dgp = D3SingleRedundant(d=3, redundant_fns=lambda x: x**2, seed=42)
         Z = dgp.sample(100)
         
         # Z[:, 1] should equal Z[:, 0]**2
@@ -111,8 +116,8 @@ class TestD3SingleRedundant:
         dgp = D3SingleRedundant(d=3, noise_std=0.1, seed=42)
         Z = dgp.sample(1000)
         
-        # Correlation should be high but not perfect
-        corr = np.corrcoef(Z[:, 0]**2, Z[:, 1])[0, 1]
+        # Correlation should be high but not perfect (default fn is tanh)
+        corr = np.corrcoef(np.tanh(Z[:, 0]), Z[:, 1])[0, 1]
         assert 0.9 < corr < 1.0
     
     def test_minimum_d(self):
@@ -132,7 +137,7 @@ class TestD4MultiRedundant:
     
     def test_redundancy(self):
         """Test that Z[:, 2] = g(Z[:, 0], Z[:, 1])."""
-        dgp = D4MultiRedundant(d=4, redundant_fn=lambda x, y: x * y, seed=42)
+        dgp = D4MultiRedundant(d=4, redundant_fns=lambda x, y: x * y, seed=42)
         Z = dgp.sample(100)
         
         # Z[:, 2] should equal Z[:, 0] * Z[:, 1]
@@ -140,7 +145,7 @@ class TestD4MultiRedundant:
     
     def test_custom_redundancy_function(self):
         """Test with custom redundancy function."""
-        dgp = D4MultiRedundant(d=3, redundant_fn=lambda x, y: x + y, seed=42)
+        dgp = D4MultiRedundant(d=3, redundant_fns=lambda x, y: x + y, seed=42)
         Z = dgp.sample(100)
         
         np.testing.assert_array_almost_equal(Z[:, 2], Z[:, 0] + Z[:, 1])

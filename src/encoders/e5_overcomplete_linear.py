@@ -8,12 +8,12 @@ from .base import BaseEncoder
 
 
 class E5OvercompleteLinear(BaseEncoder):
-    """
+    r"""
     E5: Overcomplete, elementwise linear encoder.
     
-    Higher dimensionality m > d. Some ground-truth factors appear as multiple 
-    scaled coordinates in Ẑ:
-        Ẑ_j1 = a_j1 * Z_i, Ẑ_j2 = a_j2 * Z_i for some i
+    Higher dimensionality $m > d$. Some ground-truth factors appear as multiple 
+    scaled coordinates in $\hat{Z}$:
+        $\hat{Z}_{j1} = a_{j1} * Z_i$, $\hat{Z}_{j2} = a_{j2} * Z_i$,
     
     possibly with additional unused or noisy dimensions.
     """
@@ -56,6 +56,7 @@ class E5OvercompleteLinear(BaseEncoder):
         self.scales = self._rng.uniform(
             self.scale_range[0], self.scale_range[1], size=self.m
         )
+        
         # Random signs
         signs = self._rng.choice([-1, 1], size=self.m)
         self.scales = self.scales * signs

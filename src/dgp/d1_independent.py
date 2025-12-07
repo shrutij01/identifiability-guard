@@ -8,11 +8,11 @@ from .base import BaseDGP
 
 
 class D1Independent(BaseDGP):
-    """
+    r"""
     D1: Independent, non-redundant DGP.
     
-    The coordinates Z_1, ..., Z_d are mutually independent and non-redundant:
-    no Z_j is (deterministically) a function of the remaining coordinates.
+    The coordinates $Z_1, \ldots, Z_d$ are mutually independent and non-redundant:
+    no $Z_j$ is (deterministically) a function of the remaining coordinates.
     
     Each factor is sampled independently from a standard normal distribution.
     """

@@ -7,16 +7,16 @@ import numpy as np
 from .base import BaseEncoder
 
 
-class E4UndercompleteLInear(BaseEncoder):
-    """
+class E4UndercompleteLinear(BaseEncoder):
+    r"""
     E4: Undercomplete, elementwise linear encoder.
     
-    Lower dimensionality m < d. Each learned coordinate is a scaled version 
+    Lower dimensionality $m < d$. Each learned coordinate is a scaled version 
     of a distinct ground-truth factor:
-        Ẑ_j = a_j * Z_i(j), j = 1, ..., m
+        $\hat{Z}_j = a_j * Z_{i(j)}$, where all $i(j)$ are distinct and $a_j \neq 0$.
     
-    with all i(j) distinct and a_j ≠ 0. This encoder is elementwise but lossy:
-    some ground-truth factors have no representation in Ẑ.
+    This encoder is elementwise but lossy:
+    some ground-truth factors have no representation in $\hat{Z}$.
     """
     
     def __init__(
@@ -24,6 +24,7 @@ class E4UndercompleteLInear(BaseEncoder):
         d: int,
         m: int,
         scale_range: tuple = (0.5, 2.0),
+        selection_mode: str = "random",
         seed: Optional[int] = None,
     ):
         """
@@ -39,6 +40,7 @@ class E4UndercompleteLInear(BaseEncoder):
             raise ValueError(f"E4 requires m < d, got m={m}, d={d}")
         super().__init__(d=d, m=m, seed=seed)
         self.scale_range = scale_range
+        self.selection_mode = selection_mode
         
         # Parameters to be initialized
         self.scales: Optional[np.ndarray] = None
@@ -46,14 +48,20 @@ class E4UndercompleteLInear(BaseEncoder):
     
     def _initialize_parameters(self) -> None:
         """Initialize scaling factors and select which factors to keep."""
-        # Randomly select m distinct factors from d
-        self.selected_indices = self._rng.choice(self.d, size=self.m, replace=False)
-        self.selected_indices.sort()  # Keep order for reproducibility
+        if self.selection_mode == "random":
+            # Randomly select m distinct factors from d
+            self.selected_indices = self._rng.choice(self.d, size=self.m, replace=False)
+            self.selected_indices.sort()  # Keep order for reproducibility
+        elif self.selection_mode == "sequential":
+            self.selected_indices = np.arange(self.m)
+        else:
+            raise ValueError(f"Unknown selection_mode: {self.selection_mode}")
         
         # Random scaling factors (non-zero)
         self.scales = self._rng.uniform(
             self.scale_range[0], self.scale_range[1], size=self.m
         )
+        
         # Random signs
         signs = self._rng.choice([-1, 1], size=self.m)
         self.scales = self.scales * signs

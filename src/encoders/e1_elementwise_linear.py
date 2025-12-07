@@ -8,12 +8,12 @@ from .base import BaseEncoder
 
 
 class E1ElementwiseLinear(BaseEncoder):
-    """
+    r"""
     E1: Exact, elementwise linear encoder.
     
-    Same dimensionality m = d. Each learned coordinate is a scaled version 
+    Same dimensionality $m = d$. Each learned coordinate is a scaled version 
     of exactly one ground-truth coordinate, up to permutation:
-        Ẑ_j = a_j * Z_π(j), where a_j ≠ 0
+        $\hat{Z}_j = a_j * Z_{\pi(j)}$, where $a_j \neq 0$ and $\pi$ is a permutation.
     
     This map is information-preserving and elementwise linear.
     """
@@ -48,6 +48,7 @@ class E1ElementwiseLinear(BaseEncoder):
         self.scales = self._rng.uniform(
             self.scale_range[0], self.scale_range[1], size=self.d
         )
+        
         # Random signs
         signs = self._rng.choice([-1, 1], size=self.d)
         self.scales = self.scales * signs

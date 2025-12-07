@@ -7,17 +7,21 @@ import numpy as np
 
 
 class BaseMetric(ABC):
-    """
+    r"""
     Abstract base class for Identifiability Metrics.
     
-    A metric computes an identifiability score M(Z, Ẑ) ∈ [0, 1] from
-    ground-truth factors Z ∈ R^d and learned coordinates Ẑ ∈ R^m.
+    A metric computes an identifiability score $M(Z, \hat{Z}) \in [0, 1]$ from
+    ground-truth factors $Z \in \mathbb{R}^d$ and learned coordinates 
+    $\hat{Z} \in \mathbb{R}^m$.
+    
     Higher scores indicate better identifiability.
     """
     
     @abstractmethod
     def compute(
-        self, Z: np.ndarray, Z_hat: np.ndarray
+        self, 
+        Z: np.ndarray, 
+        Z_hat: np.ndarray,
     ) -> Union[float, Dict[str, float]]:
         """
         Compute the identifiability metric.

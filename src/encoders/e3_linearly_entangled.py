@@ -8,14 +8,14 @@ from .base import BaseEncoder
 
 
 class E3LinearlyEntangled(BaseEncoder):
-    """
+    r"""
     E3: Exact, linearly entangled encoder.
     
-    Same dimensionality m = d. The encoder is a dense invertible linear map:
-        Ẑ = A @ Z
+    Same dimensionality $m = d$. The encoder is a dense invertible linear map:
+        $\hat{Z} = A Z$,
     
-    where A ∈ R^{d×d} is invertible and has at least one row with two or 
-    more nonzero entries, so each coordinate of Ẑ mixes several factors.
+    where $A \in \mathbb{R}^{d \times d}$ is invertible and has at least one row with two or 
+    more nonzero entries, so each coordinate of $\hat{Z}$ mixes several factors.
     """
     
     def __init__(
@@ -44,7 +44,7 @@ class E3LinearlyEntangled(BaseEncoder):
         # Generate a random matrix
         A = self._rng.standard_normal(size=(self.d, self.d))
         
-        # Ensure it's invertible with desired conditioning via SVD
+        # Ensure it is invertible with desired conditioning via SVD
         U, s, Vt = np.linalg.svd(A)
         
         # Scale singular values to achieve target condition number
@@ -71,6 +71,6 @@ class E3LinearlyEntangled(BaseEncoder):
         if not self._initialized:
             self._initialize_parameters()
         
-        # Apply linear transformation: Z_hat = Z @ A.T (equivalent to A @ Z.T).T
+        # Apply linear transformation: Z_hat = Z @ A.T (equivalent to A @ Z.T)
         Z_hat = Z @ self.mixing_matrix.T
         return Z_hat

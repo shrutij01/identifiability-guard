@@ -4,17 +4,19 @@ from itertools import permutations
 from typing import Optional
 
 import numpy as np
+from scipy.stats import pearsonr, spearmanr
 
 from .base import BaseMetric
 
 
 class MCC(BaseMetric):
-    """
+    r"""
+    TODO: see with Shruti what efficient formulation to use
     Mean Correlation Coefficient (MCC) metric.
     
-    MCC(ρ) = (1/k) * max_{π ∈ S_k} Σ_{i=1}^{k} |Corr(Z_i, Ẑ_π(i))|
+    $MCC(\rho) = \frac{1}{k} \max_{\pi \in S_k} \sum_{i=1}^{k} |\text{Corr}(Z_i, \hat{Z}_{\pi(i)})|$
     
-    where k = min(d, m) and we find the best permutation that maximizes
+    where $k = \min(d, m)$ and we find the best permutation that maximizes
     the average absolute correlation between matched pairs.
     
     For large dimensions, finding the optimal permutation is expensive
@@ -64,7 +66,10 @@ class MCC(BaseMetric):
         return mcc
     
     def _compute_correlation_matrix(
-        self, Z: np.ndarray, Z_hat: np.ndarray
+        self, 
+        Z: np.ndarray, 
+        Z_hat: np.ndarray,
+        method: str = "pearson"
     ) -> np.ndarray:
         """
         Compute correlation matrix between Z and Z_hat.
@@ -72,24 +77,18 @@ class MCC(BaseMetric):
         Args:
             Z: Array of shape (n, d).
             Z_hat: Array of shape (n, m).
+            method: Correlation method, either "pearson" or "spearman".
             
         Returns:
-            corr: Array of shape (d, m) with Pearson correlations.
+            corr: Array of shape (d, m) with correlations.
         """
-        d = Z.shape[1]
-        m = Z_hat.shape[1]
+        if method not in ("pearson", "spearman"):
+            raise ValueError("method must be 'pearson' or 'spearman'")
         
-        # Standardize
-        Z_std = (Z - Z.mean(axis=0)) / (Z.std(axis=0) + 1e-10)
-        Z_hat_std = (Z_hat - Z_hat.mean(axis=0)) / (Z_hat.std(axis=0) + 1e-10)
+        corr_func = pearsonr if method == "pearson" else spearmanr
         
-        # Compute correlation matrix
-        corr = np.zeros((d, m))
-        for i in range(d):
-            for j in range(m):
-                corr[i, j] = np.mean(Z_std[:, i] * Z_hat_std[:, j])
+        return corr_func(Z, Z_hat, axis=0)[0]  # Shape (d, m)
         
-        return corr
     
     def _hungarian_matching(self, abs_corr: np.ndarray) -> float:
         """

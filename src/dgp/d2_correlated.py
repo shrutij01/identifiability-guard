@@ -8,12 +8,12 @@ from .base import BaseDGP
 
 
 class D2Correlated(BaseDGP):
-    """
+    r"""
     D2: Correlated, non-redundant DGP.
     
-    The coordinates Z_1, ..., Z_d are statistically dependent 
-    (e.g., Cov(Z_i, Z_j) ≠ 0 for some i ≠ j), but still non-redundant:
-    no Z_j is a deterministic function of the others.
+    The coordinates $Z_1, \ldots, Z_d$ are statistically dependent 
+    (e.g., $\text{Cov}(Z_i, Z_j) \neq 0$ for some $i \neq j$), but still non-redundant:
+    no $Z_j$ is a deterministic function of the others.
     
     Factors are sampled from a multivariate normal with a specified
     correlation structure.

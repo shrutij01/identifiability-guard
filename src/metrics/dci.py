@@ -11,6 +11,7 @@ from .base import BaseMetric
 
 class DCI(BaseMetric):
     """
+    TODO: use other implem - see with Shruti
     Disentanglement, Completeness, Informativeness (DCI) metric.
     
     The DCI framework measures three aspects:

@@ -8,16 +8,15 @@ from .base import BaseEncoder
 
 
 class E6OvercompleteMulticodes(BaseEncoder):
-    """
+    r"""
+    TODO: finish this class or delete it - double check with Shruti
     E6: Overcomplete, multiple codes per factor encoder.
     
-    Higher dimensionality m > d. Multiple learned coordinates represent the 
+    Higher dimensionality $m > d$. Multiple learned coordinates represent the 
     same ground-truth factor, potentially nonlinearly:
-        Ẑ_j1 = h_j1(Z_i), Ẑ_j2 = h_j2(Z_i) for some i
+        $\hat{Z}_{j1} = h_{j1}(Z_1, \ldots, Z_d)$,
     
-    with enough coordinates overall to keep the map (approximately) 
-    information-preserving. This encoder is overcomplete and has multiple 
-    codes per factor.
+    This encoder is overcomplete and has multiple codes per factor.
     """
     
     def __init__(
@@ -40,24 +39,14 @@ class E6OvercompleteMulticodes(BaseEncoder):
         if m <= d:
             raise ValueError(f"E6 requires m > d, got m={m}, d={d}")
         super().__init__(d=d, m=m, seed=seed)
-        self.nonlinear_fns = nonlinear_fns
+        self.nonlinear_fns = nonlinear_fns if nonlinear_fns is not None else (
+            lambda *args: args[0] * np.sum(args[1:], axis=1)
+        )
         
         # Parameters to be initialized
         self.source_indices: Optional[np.ndarray] = None
         self._functions: Optional[List[Callable]] = None
-    
-    @staticmethod
-    def _get_default_nonlinear_functions() -> List[Callable[[np.ndarray], np.ndarray]]:
-        """Return a list of default invertible nonlinear functions."""
-        return [
-            lambda x: x,                             # identity
-            lambda x: np.tanh(x),                    # tanh
-            lambda x: np.sinh(x),                    # sinh
-            lambda x: np.sign(x) * np.abs(x) ** 0.5, # signed sqrt
-            lambda x: x ** 3,                        # cube
-            lambda x: np.sign(x) * np.log1p(np.abs(x)),  # signed log1p
-        ]
-    
+        
     def _initialize_parameters(self) -> None:
         """Initialize source mapping and select nonlinear functions."""
         # Map each of m outputs to one of d inputs
@@ -67,15 +56,15 @@ class E6OvercompleteMulticodes(BaseEncoder):
         self.source_indices = np.concatenate([base_assignment, extra_assignments])
         self._rng.shuffle(self.source_indices)
         
-        # Set up functions
-        if self.nonlinear_fns is not None:
-            if len(self.nonlinear_fns) < self.m:
-                raise ValueError(f"Need at least {self.m} functions, got {len(self.nonlinear_fns)}")
-            self._functions = self.nonlinear_fns[:self.m]
-        else:
-            # Cycle through default functions
-            default_fns = self._get_default_nonlinear_functions()
-            self._functions = [default_fns[i % len(default_fns)] for i in range(self.m)]
+        # # Set up functions
+        # if self.nonlinear_fns is not None:
+        #     if len(self.nonlinear_fns) < self.m:
+        #         raise ValueError(f"Need at least {self.m} functions, got {len(self.nonlinear_fns)}")
+        #     self._functions = self.nonlinear_fns[:self.m]
+        # else:
+        #     # Cycle through default functions
+        #     default_fns = self._get_default_nonlinear_functions()
+        #     self._functions = [default_fns[i % len(default_fns)] for i in range(self.m)]
         
         self._initialized = True
     
@@ -96,7 +85,12 @@ class E6OvercompleteMulticodes(BaseEncoder):
             self._initialize_parameters()
         
         n = Z.shape[0]
+        overcomplete = self.nonlinear_fns(*Z.T)
+        #TODO: make some mixing that makes sense!!
+
         Z_hat = np.zeros((n, self.m))
+        Z_hat[:, :self.d] = Z  # First d outputs are direct copies
+
         
         # Apply nonlinear function to each mapped source
         for j in range(self.m):

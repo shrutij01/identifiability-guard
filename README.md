@@ -13,12 +13,9 @@ This project provides a modular codebase for studying identifiability metrics in
 ## Installation
 
 ```bash
-pip install -e .
-```
-
-For development:
-```bash
-pip install -e ".[dev]"
+python -m venv env
+source env/bin/activate
+pip install -r requirements.txt
 ```
 
 ## Data Generating Processes (DGPs)
@@ -46,14 +43,14 @@ Z_corr = dgp_corr.sample(1000)
 
 ## Encoder Mixings
 
-| Encoder | Name | Description |
-|---------|------|-------------|
-| E1 | Elementwise Linear | Ẑ_j = a_j · Z_π(j), m = d |
-| E2 | Elementwise Nonlinear | Ẑ_j = h_j(Z_π(j)), m = d |
-| E3 | Linearly Entangled | Ẑ = A · Z (dense mixing), m = d |
-| E4 | Undercomplete Linear | Elementwise scaling, m < d |
-| E5 | Overcomplete Linear | Redundant scaled copies, m > d |
-| E6 | Overcomplete Multicodes | Multiple nonlinear codes per factor, m > d |
+| Encoder | Name | Description | Status |
+|---------|------|-------------|--------|
+| E1 | Elementwise Linear | Ẑ_j = a_j · Z_π(j), m = d | ✅ |
+| E2 | Elementwise Nonlinear | Ẑ_j = h_j(Z_π(j)), m = d | ✅ |
+| E3 | Linearly Entangled | Ẑ = A · Z (dense mixing), m = d | ✅ |
+| E4 | Undercomplete Linear | Elementwise scaling, m < d | ✅ |
+| E5 | Overcomplete Linear | Redundant scaled copies, m > d | ✅ |
+| E6 | Overcomplete Multicodes | Multiple nonlinear codes per factor, m > d | 🚧 TODO |
 
 ### Example Usage
 
@@ -76,11 +73,11 @@ Z_hat_ent = encoder_ent.encode(Z)
 
 ## Identifiability Metrics
 
-### MCC (Mean Correlation Coefficient)
+### MCC (Mean Correlation Coefficient) — 🚧 TODO
 
 $$\text{MCC}(\rho) = \frac{1}{k} \max_{\pi \in S_k} \sum_{i=1}^k |\text{Corr}(Z_i, \hat{Z}_{\pi(i)})|$$
 
-### DCI (Disentanglement, Completeness, Informativeness)
+### DCI (Disentanglement, Completeness, Informativeness) — 🚧 TODO
 
 - **Disentanglement**: Each code depends on at most one factor
 - **Completeness**: Each factor is captured by at most one code

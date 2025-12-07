@@ -7,7 +7,7 @@ from src.encoders import (
     E1ElementwiseLinear,
     E2ElementwiseNonlinear,
     E3LinearlyEntangled,
-    E4UndercompleteLInear,
+    E4UndercompleteLinear,
     E5OvercompleteLinear,
     E6OvercompleteMulticodes,
 )
@@ -127,19 +127,19 @@ class TestE3LinearlyEntangled:
             assert nonzeros > 1, "Mixing matrix should have multiple nonzeros per row"
 
 
-class TestE4UndercompleteLInear:
+class TestE4UndercompleteLinear:
     """Tests for E4 undercomplete linear encoder."""
     
     def test_basic_encoding(self):
         """Test basic encoding works."""
-        encoder = E4UndercompleteLInear(d=5, m=3, seed=42)
+        encoder = E4UndercompleteLinear(d=5, m=3, seed=42)
         Z = np.random.randn(100, 5)
         Z_hat = encoder.encode(Z)
         assert Z_hat.shape == (100, 3)
     
     def test_dimensionality_reduction(self):
         """Test that output has fewer dimensions."""
-        encoder = E4UndercompleteLInear(d=10, m=4, seed=42)
+        encoder = E4UndercompleteLinear(d=10, m=4, seed=42)
         Z = np.random.randn(50, 10)
         Z_hat = encoder.encode(Z)
         assert Z_hat.shape[1] < Z.shape[1]
@@ -147,9 +147,9 @@ class TestE4UndercompleteLInear:
     def test_m_must_be_less_than_d(self):
         """Test that m >= d raises error."""
         with pytest.raises(ValueError):
-            E4UndercompleteLInear(d=3, m=3)
+            E4UndercompleteLinear(d=3, m=3)
         with pytest.raises(ValueError):
-            E4UndercompleteLInear(d=3, m=5)
+            E4UndercompleteLinear(d=3, m=5)
 
 
 class TestE5OvercompleteLinear:

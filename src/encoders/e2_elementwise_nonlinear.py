@@ -8,14 +8,14 @@ from .base import BaseEncoder
 
 
 class E2ElementwiseNonlinear(BaseEncoder):
-    """
+    r"""
     E2: Exact, elementwise invertible nonlinear encoder.
     
-    Same dimensionality m = d. Each learned coordinate is an invertible 
+    Same dimensionality $m = d$. Each learned coordinate is an invertible 
     nonlinear function of exactly one ground-truth coordinate:
-        Ẑ_j = h_j(Z_π(j))
+        $\hat{Z}_j = h_j(Z_{\pi(j)})$,
     
-    where each h_j is scalar and invertible, and π is a permutation.
+    where each $h_j$ is scalar and invertible, and $\pi$ is a permutation.
     This map is information-preserving and elementwise nonlinear.
     """
     
@@ -43,18 +43,7 @@ class E2ElementwiseNonlinear(BaseEncoder):
         # Parameters to be initialized
         self.permutation: Optional[np.ndarray] = None
         self._functions: Optional[List[Callable]] = None
-    
-    @staticmethod
-    def _get_default_nonlinear_functions() -> List[Callable[[np.ndarray], np.ndarray]]:
-        """Return a list of default invertible nonlinear functions."""
-        return [
-            lambda x: np.tanh(x),                    # tanh (invertible)
-            lambda x: np.sinh(x),                    # sinh (invertible)
-            lambda x: np.sign(x) * np.abs(x) ** 0.5, # signed sqrt (invertible)
-            lambda x: x ** 3,                        # cube (invertible)
-            lambda x: np.sign(x) * np.log1p(np.abs(x)),  # signed log1p
-        ]
-    
+        
     def _initialize_parameters(self) -> None:
         """Initialize permutation and select nonlinear functions."""
         # Random permutation
@@ -91,10 +80,8 @@ class E2ElementwiseNonlinear(BaseEncoder):
         if not self._initialized:
             self._initialize_parameters()
         
-        # Apply permutation
+        # Apply permutation then nonlinear functions
         Z_permuted = Z[:, self.permutation]
-        
-        # Apply nonlinear functions elementwise
         Z_hat = np.zeros_like(Z_permuted)
         for j in range(self.d):
             Z_hat[:, j] = self._functions[j](Z_permuted[:, j])

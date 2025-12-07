@@ -1,17 +1,17 @@
 """Base class for Encoder Mixings."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Callable, List
 
 import numpy as np
 
 
 class BaseEncoder(ABC):
-    """
+    r"""
     Abstract base class for Encoder Mixings.
     
-    An encoder transforms ground-truth latent factors Z ∈ R^d to 
-    learned representations Ẑ ∈ R^m.
+    An encoder transforms ground-truth latent factors $Z \in \mathbb{R}^d$ to 
+    learned representations $\hat{Z} \in \mathbb{R}^m$.
     
     Attributes:
         d: Input dimensionality (number of ground-truth factors).
@@ -66,6 +66,19 @@ class BaseEncoder(ABC):
             self.seed = seed
         self._rng = np.random.default_rng(self.seed)
         self._initialized = False
+
+    @staticmethod
+    def _get_default_nonlinear_functions() -> List[Callable[[np.ndarray], np.ndarray]]:
+        """Return a list of default invertible nonlinear functions."""
+        return [
+            lambda x: np.tanh(x),                       # tanh (invertible)
+            lambda x: np.sinh(x),                       # sinh (invertible)
+            lambda x: np.sign(x) * np.abs(x) ** 0.5,    # signed sqrt (invertible)
+            lambda x: x ** 3,                           # cube (invertible)
+            lambda x: x ** 5,                           # fifth power (invertible)
+            lambda x: np.exp(x) - 1,                    # exp - 1 (invertible)
+            lambda x: np.sign(x) * np.log1p(np.abs(x)), # signed log1p
+        ]
     
     @property
     def name(self) -> str:
