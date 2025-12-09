@@ -59,7 +59,7 @@ class E2ElementwiseNonlinear(BaseEncoder):
             self._functions = self.nonlinear_fns
         else:
             # Cycle through default functions
-            default_fns = self._get_default_nonlinear_functions()
+            default_fns = self._get_default_nonlinear_invertible_functions()
             self._functions = [default_fns[i % len(default_fns)] for i in range(self.d)]
         
         self._initialized = True

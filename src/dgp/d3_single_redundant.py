@@ -58,7 +58,7 @@ class D3SingleRedundant(BaseDGP):
             else:
                 raise ValueError("redundant_fns must be a callable or list of callables")
         else:
-            default_fns = self._get_default_nonlinear_functions()
+            default_fns = self._get_default_nonlinear_invertible_functions()
             self.redundant_fns = [default_fns[i % len(default_fns)] for i in range(self.r)]
 
         self.noise_std = noise_std

@@ -46,7 +46,7 @@ class BaseDGP(ABC):
         pass
 
     @staticmethod
-    def _get_default_nonlinear_functions() -> List[Callable[[np.ndarray], np.ndarray]]:
+    def _get_default_nonlinear_invertible_functions() -> List[Callable[[np.ndarray], np.ndarray]]:
         """Return a list of default invertible nonlinear functions."""
         return [
             lambda x: np.tanh(x),                       # tanh (invertible)

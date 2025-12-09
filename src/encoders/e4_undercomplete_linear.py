@@ -22,7 +22,7 @@ class E4UndercompleteLinear(BaseEncoder):
     def __init__(
         self,
         d: int,
-        m: int,
+        m: int = None,
         scale_range: tuple = (0.5, 2.0),
         selection_mode: str = "random",
         seed: Optional[int] = None,
@@ -36,8 +36,12 @@ class E4UndercompleteLinear(BaseEncoder):
             scale_range: Range (min, max) for random scaling factors.
             seed: Optional random seed for reproducibility.
         """
+        if m is None:
+            m = d - 1
+        
         if m >= d:
             raise ValueError(f"E4 requires m < d, got m={m}, d={d}")
+        
         super().__init__(d=d, m=m, seed=seed)
         self.scale_range = scale_range
         self.selection_mode = selection_mode
@@ -85,6 +89,6 @@ class E4UndercompleteLinear(BaseEncoder):
             self._initialize_parameters()
         
         # Select subset of factors and scale
-        Z_selected = Z[:, self.selected_indices]
-        Z_hat = Z_selected * self.scales
+        Z_hat = Z[:, self.selected_indices] * self.scales
+        
         return Z_hat
