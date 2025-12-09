@@ -21,7 +21,7 @@ class E5OvercompleteLinear(BaseEncoder):
     def __init__(
         self,
         d: int,
-        m: int,
+        m: int = None,
         scale_range: tuple = (0.5, 2.0),
         seed: Optional[int] = None,
     ):
@@ -34,8 +34,12 @@ class E5OvercompleteLinear(BaseEncoder):
             scale_range: Range (min, max) for random scaling factors.
             seed: Optional random seed for reproducibility.
         """
+        if m is None:
+            m = d + 1
+        
         if m <= d:
             raise ValueError(f"E5 requires m > d, got m={m}, d={d}")
+        
         super().__init__(d=d, m=m, seed=seed)
         self.scale_range = scale_range
         
