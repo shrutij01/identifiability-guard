@@ -111,3 +111,4 @@ venv.bak/
 .history/
 CLAUDE.md
 instruction_pile.md
+test_results/

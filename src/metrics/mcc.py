@@ -434,14 +434,15 @@ def mean_corr_coef_np(x, y, method="pearson"):
     :return: float
     """
     d = x.shape[1]
+    m = y.shape[1]
     if method == "pearson":
         cc = np.corrcoef(x, y, rowvar=False)[:d, d:]
     elif method == "spearman":
         cc = spearmanr(x, y)[0][:d, d:]
     elif method == "rdc":
-        cc = np.zeros((d, d))
-        for i in range(x.shape[1]):
-            for j in range(y.shape[1]):
+        cc = np.zeros((d, m))
+        for i in range(d):
+            for j in range(m):
                 cc[i, j] = rdc(x[:, i], y[:, j])
     else:
         raise ValueError("not a valid method: {}".format(method))
@@ -450,7 +451,8 @@ def mean_corr_coef_np(x, y, method="pearson"):
 
     # ipdb.set_trace()
     score = cc[linear_sum_assignment(-1 * cc)].mean()
-    return score
+    # Clip to [0, 1] to handle floating-point precision issues
+    return float(np.clip(score, 0.0, 1.0))
 
 
 def mean_corr_coef(x, y, method="pearson"):
@@ -485,6 +487,7 @@ def mean_corr_coef_out_of_sample(x, y, x_test, y_test, method="pearson"):
     """
 
     d = x.shape[1]
+    m = y.shape[1]
     if method == "pearson":
         cc = np.corrcoef(x, y, rowvar=False)[:d, d:]
         cc_test = np.corrcoef(x_test, y_test, rowvar=False)[:d, d:]
@@ -492,20 +495,21 @@ def mean_corr_coef_out_of_sample(x, y, x_test, y_test, method="pearson"):
         cc = spearmanr(x, y)[0][:d, d:]
         cc_test = spearmanr(x_test, y_test)[0][:d, d:]
     elif method == "rdc":
-        cc = np.zeros((d, d))
-        for i in range(x.shape[1]):
-            for j in range(y.shape[1]):
+        cc = np.zeros((d, m))
+        for i in range(d):
+            for j in range(m):
                 cc[i, j] = rdc(x[:, i], y[:, j])
-        cc_test = np.zeros((d, d))
-        for i in range(x_test.shape[1]):
-            for j in range(y_test.shape[1]):
+        cc_test = np.zeros((d, m))
+        for i in range(d):
+            for j in range(m):
                 cc_test[i, j] = rdc(x_test[:, i], y_test[:, j])
     else:
         raise ValueError("not a valid method: {}".format(method))
     cc = np.abs(cc)
 
     score = np.abs(cc_test)[linear_sum_assignment(-1 * cc)].mean()
-    return score
+    # Clip to [0, 1] to handle floating-point precision issues
+    return float(np.clip(score, 0.0, 1.0))
 
 
 # ============================================================================
@@ -545,6 +549,8 @@ class MCCMetric(BaseMetric):
     def _compute_impl(self, Z: np.ndarray, Z_hat: np.ndarray) -> MetricResult:
         """Compute MCC from samples (supports both NumPy and PyTorch)."""
         mcc_score = float(mean_corr_coef(Z, Z_hat, method=self.method))
+        # Clip to [0, 1] to handle floating-point precision issues
+        mcc_score = float(np.clip(mcc_score, 0.0, 1.0))
 
         return self.make_result(
             primary_score=mcc_score,
