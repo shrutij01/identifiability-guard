@@ -105,3 +105,9 @@ venv.bak/
 *.swp
 *.swo
 *~
+
+# Misc
+.DS_Store
+.history/
+CLAUDE.md
+instruction_pile.md
