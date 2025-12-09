@@ -9,7 +9,6 @@ from .base import BaseEncoder
 
 class E6OvercompleteMulticodes(BaseEncoder):
     r"""
-    TODO: finish this class or delete it - double check with Shruti
     E6: Overcomplete, multiple codes per factor encoder.
     
     Higher dimensionality $m > d$. Multiple learned coordinates represent the 
@@ -22,7 +21,7 @@ class E6OvercompleteMulticodes(BaseEncoder):
     def __init__(
         self,
         d: int,
-        m: int,
+        m: int = None,
         nonlinear_fns: Optional[List[Callable[[np.ndarray], np.ndarray]]] = None,
         seed: Optional[int] = None,
     ):
@@ -36,11 +35,15 @@ class E6OvercompleteMulticodes(BaseEncoder):
                 If None, uses a mix of default invertible functions.
             seed: Optional random seed for reproducibility.
         """
+        if m is None:
+            m = d + 1
+        
         if m <= d:
             raise ValueError(f"E6 requires m > d, got m={m}, d={d}")
+        
         super().__init__(d=d, m=m, seed=seed)
         self.nonlinear_fns = nonlinear_fns if nonlinear_fns is not None else (
-            lambda *args: args[0] * np.sum(args[1:], axis=1)
+            lambda args: args[:, 0] * np.sum(args[:, 1:], axis=1)
         )
         
         # Parameters to be initialized
@@ -56,15 +59,15 @@ class E6OvercompleteMulticodes(BaseEncoder):
         self.source_indices = np.concatenate([base_assignment, extra_assignments])
         self._rng.shuffle(self.source_indices)
         
-        # # Set up functions
-        # if self.nonlinear_fns is not None:
-        #     if len(self.nonlinear_fns) < self.m:
-        #         raise ValueError(f"Need at least {self.m} functions, got {len(self.nonlinear_fns)}")
-        #     self._functions = self.nonlinear_fns[:self.m]
-        # else:
-        #     # Cycle through default functions
-        #     default_fns = self._get_default_nonlinear_functions()
-        #     self._functions = [default_fns[i % len(default_fns)] for i in range(self.m)]
+        # Set up functions
+        if self._functions is not None:
+            if len(self._functions) < self.d:
+                raise ValueError(f"Need at least {self.d} functions, got {len(self._functions)}")
+            self._functions = self._functions[:self.d]
+        else:
+            # Cycle through default functions
+            default_fns = self._get_default_nonlinear_invertible_functions()
+            self._functions = [default_fns[i % len(default_fns)] for i in range(self.d)]
         
         self._initialized = True
     
@@ -85,16 +88,14 @@ class E6OvercompleteMulticodes(BaseEncoder):
             self._initialize_parameters()
         
         n = Z.shape[0]
-        overcomplete = self.nonlinear_fns(*Z.T)
-        #TODO: make some mixing that makes sense!!
+        overcomplete = self.nonlinear_fns(Z)
 
         Z_hat = np.zeros((n, self.m))
         Z_hat[:, :self.d] = Z  # First d outputs are direct copies
+        Z_hat[:, self.d:] = overcomplete.reshape((n, self.m - self.d))  # Remaining are nonlinear codes
 
-        
-        # Apply nonlinear function to each mapped source
-        for j in range(self.m):
-            source_idx = self.source_indices[j]
-            Z_hat[:, j] = self._functions[j](Z[:, source_idx])
+        # apply nonlinear functions everywhere
+        for i in range(self.d):
+            Z_hat[:, i] = self._functions[i](Z_hat[:, i])
         
         return Z_hat
