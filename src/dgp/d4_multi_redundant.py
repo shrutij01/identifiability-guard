@@ -22,7 +22,7 @@ class D4MultiRedundant(BaseDGP):
     def __init__(
         self,
         d: int,
-        r: int = 1,
+        r: int = None,
         redundant_fns: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None,
         noise_std: float = 0.0,
         seed: Optional[int] = None,
@@ -42,9 +42,12 @@ class D4MultiRedundant(BaseDGP):
             raise ValueError("d must be at least 3 for D4 (need 2 sources + redundant)")
         super().__init__(d=d, seed=seed)
         
+        if r is None:
+            r = int(np.sqrt(d))
+        
         self.r = r
         if r < 1 or r >= d/2:
-            raise ValueError("r must be at least 1 and less than d/2 for D4")
+            raise ValueError(f"r must be at least 1 and less than d/2 for D4, got r={r}, d={d}")
         
         if redundant_fns is not None:
             if callable(redundant_fns):

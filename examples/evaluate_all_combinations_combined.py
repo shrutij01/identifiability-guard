@@ -256,7 +256,7 @@ def create_combined_heatmap(
         
         # Get DGP display name
         dgp_cls = DGP_CLASSES[dgp_name]
-        dgp_instance = dgp_cls(d=4)
+        dgp_instance = dgp_cls(d=5) # d=5 is arbitrary just for naming
         dgp_title = dgp_instance.name
         
         # Add title for this subplot
