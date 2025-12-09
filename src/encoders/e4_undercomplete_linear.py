@@ -24,7 +24,7 @@ class E4UndercompleteLinear(BaseEncoder):
         d: int,
         m: int = None,
         scale_range: tuple = (0.5, 2.0),
-        selection_mode: str = "random",
+        selection_mode: str = "inverse_sequential",
         seed: Optional[int] = None,
     ):
         """
@@ -58,6 +58,8 @@ class E4UndercompleteLinear(BaseEncoder):
             self.selected_indices.sort()  # Keep order for reproducibility
         elif self.selection_mode == "sequential":
             self.selected_indices = np.arange(self.m)
+        elif self.selection_mode == "inverse_sequential":
+            self.selected_indices = np.arange(self.d - self.m, self.d)
         else:
             raise ValueError(f"Unknown selection_mode: {self.selection_mode}")
         
@@ -90,5 +92,5 @@ class E4UndercompleteLinear(BaseEncoder):
         
         # Select subset of factors and scale
         Z_hat = Z[:, self.selected_indices] * self.scales
-        
+
         return Z_hat
