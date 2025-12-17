@@ -95,6 +95,48 @@ class TestE2ElementwiseNonlinear:
         
         expected = np.array([[1.0, 0.0], [4.0, 1.0]])
         np.testing.assert_array_almost_equal(Z_hat, expected)
+    
+    def test_nonlinearity_strength_zero(self):
+        """Test that nonlinearity_strength=0 gives identity transformation."""
+        encoder = E2ElementwiseNonlinear(d=3, nonlinearity_strength=0.0, permute=False, seed=42)
+        Z = np.random.randn(50, 3)
+        Z_hat = encoder.encode(Z)
+        
+        # With strength=0, should be identity (no nonlinearity)
+        np.testing.assert_array_almost_equal(Z, Z_hat)
+    
+    def test_nonlinearity_strength_one(self):
+        """Test that nonlinearity_strength=1 gives full nonlinearity."""
+        custom_fns = [lambda x: x**2, lambda x: x**3, lambda x: np.tanh(x)]
+        encoder = E2ElementwiseNonlinear(
+            d=3, nonlinear_fns=custom_fns, nonlinearity_strength=1.0, permute=False, seed=42
+        )
+        Z = np.array([[1.0, 2.0, 0.5]])
+        Z_hat = encoder.encode(Z)
+        
+        # With strength=1, should be fully nonlinear
+        expected = np.array([[1.0, 8.0, np.tanh(0.5)]])
+        np.testing.assert_array_almost_equal(Z_hat, expected)
+    
+    def test_nonlinearity_strength_interpolation(self):
+        """Test that intermediate strength interpolates correctly."""
+        custom_fns = [lambda x: x**2]
+        encoder = E2ElementwiseNonlinear(
+            d=1, nonlinear_fns=custom_fns, nonlinearity_strength=0.5, permute=False, seed=42
+        )
+        Z = np.array([[2.0]])
+        Z_hat = encoder.encode(Z)
+        
+        # f(x) = (1-0.5)*x + 0.5*x^2 = 0.5*2 + 0.5*4 = 1 + 2 = 3
+        expected = np.array([[3.0]])
+        np.testing.assert_array_almost_equal(Z_hat, expected)
+    
+    def test_nonlinearity_strength_validation(self):
+        """Test that invalid strength values raise errors."""
+        with pytest.raises(ValueError):
+            E2ElementwiseNonlinear(d=3, nonlinearity_strength=-0.1)
+        with pytest.raises(ValueError):
+            E2ElementwiseNonlinear(d=3, nonlinearity_strength=1.5)
 
 
 class TestE3LinearlyEntangled:

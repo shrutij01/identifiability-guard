@@ -25,6 +25,7 @@ class D4MultiRedundant(BaseDGP):
         r: int = None,
         redundant_fns: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None,
         noise_std: float = 0.0,
+        redundancy_strength: Optional[float] = None,
         seed: Optional[int] = None,
     ):
         r"""
@@ -32,10 +33,13 @@ class D4MultiRedundant(BaseDGP):
         
         Args:
             d: Number of latent factors (must be >= 3).
+            r: Number of redundant factors (defaults to sqrt(d)).
             redundant_fn: Function $g:\mathbb{R}^{d-r} \to \mathbb{R}^r$ that maps $d-r$ source factors to the $r$
                 redundant factor. Defaults to $g_{d-r+i}(x_1, \ldots, x_{d-r}) = x_i * \sum_{j \neq i} x_j$.
             noise_std: Standard deviation of optional noise added to the
                 redundant factor. Default is 0 (deterministic).
+            redundancy_strength: Alias for noise_std. If provided, overrides noise_std.
+                Controls the strength of noise in redundant factors.
             seed: Optional random seed for reproducibility.
         """
         if d < 3:
@@ -63,7 +67,13 @@ class D4MultiRedundant(BaseDGP):
             default_fns = self._get_default_bivariate_functions()
             self.redundant_fns = [default_fns[i % len(default_fns)] for i in range(self.r)]
         
-        self.noise_std = noise_std
+        # Use redundancy_strength if provided, otherwise use noise_std
+        if redundancy_strength is not None:
+            self.noise_std = redundancy_strength
+            self.redundancy_strength = redundancy_strength
+        else:
+            self.noise_std = noise_std
+            self.redundancy_strength = noise_std
     
     @staticmethod
     def _get_default_bivariate_functions() -> List[Callable[[np.ndarray, np.ndarray], np.ndarray]]:
