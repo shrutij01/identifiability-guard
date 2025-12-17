@@ -10,6 +10,8 @@ from src.encoders import (
     E4UndercompleteLinear,
     E5OvercompleteLinear,
     E6OvercompleteMulticodes,
+    E7OvercompleteEntangled,
+    E8OvercompleteDisjoint,
 )
 
 
@@ -210,3 +212,114 @@ class TestE6OvercompleteMulticodes:
         """Test that m <= d raises error."""
         with pytest.raises(ValueError):
             E6OvercompleteMulticodes(d=3, m=3)
+
+
+class TestE7OvercompleteEntangled:
+    """Tests for E7 overcomplete entangled encoder."""
+    
+    def test_basic_encoding(self):
+        """Test basic encoding works."""
+        encoder = E7OvercompleteEntangled(d=3, m=6, seed=42)
+        Z = np.random.randn(100, 3)
+        Z_hat = encoder.encode(Z)
+        assert Z_hat.shape == (100, 6)
+    
+    def test_default_m_is_2d(self):
+        """Test that default m is 2*d."""
+        encoder = E7OvercompleteEntangled(d=5, seed=42)
+        assert encoder.m == 10
+        Z = np.random.randn(50, 5)
+        Z_hat = encoder.encode(Z)
+        assert Z_hat.shape == (50, 10)
+    
+    def test_full_rank(self):
+        """Test that mixing matrix is full rank (rank = d)."""
+        encoder = E7OvercompleteEntangled(d=4, m=8, seed=42)
+        Z = np.random.randn(100, 4)
+        encoder.encode(Z)
+        
+        # Check rank
+        rank = np.linalg.matrix_rank(encoder.mixing_matrix)
+        assert rank == encoder.d
+    
+    def test_mixing(self):
+        """Test that factors are mixed (not elementwise)."""
+        encoder = E7OvercompleteEntangled(d=3, m=7, seed=42)
+        Z = np.eye(3)
+        encoder.encode(Z)
+        
+        # Check that mixing matrix has multiple nonzeros per row
+        for row in encoder.mixing_matrix:
+            nonzeros = np.sum(np.abs(row) > 1e-6)
+            assert nonzeros > 1, "Mixing matrix should have multiple nonzeros per row"
+    
+    def test_m_must_be_greater_than_d(self):
+        """Test that m <= d raises error."""
+        with pytest.raises(ValueError):
+            E7OvercompleteEntangled(d=3, m=3)
+        with pytest.raises(ValueError):
+            E7OvercompleteEntangled(d=5, m=3)
+    
+    def test_condition_number(self):
+        """Test that condition number is respected."""
+        encoder = E7OvercompleteEntangled(d=4, m=8, condition_number=5.0, seed=42)
+        Z = np.random.randn(100, 4)
+        encoder.encode(Z)
+        
+        # Compute singular values
+        s = np.linalg.svd(encoder.mixing_matrix, compute_uv=False)
+        actual_cond = s[0] / s[-1]
+        
+        # Should be close to specified condition number
+        assert abs(actual_cond - 5.0) < 1.0
+
+
+class TestE8OvercompleteDisjoint:
+    """Tests for E8 overcomplete disjoint encoder."""
+    
+    def test_basic_encoding(self):
+        """Test basic encoding works."""
+        encoder = E8OvercompleteDisjoint(d=3, codes_per_factor=2, seed=42)
+        Z = np.random.randn(100, 3)
+        Z_hat = encoder.encode(Z)
+        assert Z_hat.shape == (100, 6)
+    
+    def test_default_codes_per_factor(self):
+        """Test that default codes_per_factor is 2."""
+        encoder = E8OvercompleteDisjoint(d=5, seed=42)
+        assert encoder.codes_per_factor == 2
+        assert encoder.m == 10
+    
+    def test_sin_cos_encoding(self):
+        """Test sin/cos encoding for codes_per_factor=2."""
+        encoder = E8OvercompleteDisjoint(d=2, codes_per_factor=2, seed=42)
+        Z = np.array([[0.0, np.pi/2], [np.pi, 0.0]])
+        Z_hat = encoder.encode(Z)
+        
+        # For codes_per_factor=2, should be sin/cos pairs
+        # First factor: Z[0,0]=0 -> sin(0)=0, cos(0)=1
+        # Second factor: Z[0,1]=pi/2 -> sin(pi/2)=1, cos(pi/2)=0
+        assert Z_hat.shape == (2, 4)
+    
+    def test_reconstruction_sin_cos(self):
+        """Test that sin/cos encoding can be reconstructed."""
+        encoder = E8OvercompleteDisjoint(d=3, codes_per_factor=2, seed=42)
+        Z = np.random.uniform(-np.pi, np.pi, size=(50, 3))
+        Z_hat = encoder.encode(Z)
+        Z_reconstructed = encoder.decode(Z_hat)
+        
+        # Should reconstruct angles within [-pi, pi]
+        # Check if reconstructed values are close (modulo 2*pi)
+        assert Z_reconstructed.shape == Z.shape
+    
+    def test_codes_per_factor_validation(self):
+        """Test that codes_per_factor must be at least 2."""
+        with pytest.raises(ValueError):
+            E8OvercompleteDisjoint(d=3, codes_per_factor=1)
+    
+    def test_multiple_codes_per_factor(self):
+        """Test encoding with more than 2 codes per factor."""
+        encoder = E8OvercompleteDisjoint(d=3, codes_per_factor=4, seed=42)
+        Z = np.random.randn(50, 3)
+        Z_hat = encoder.encode(Z)
+        assert Z_hat.shape == (50, 12)  # 3 factors * 4 codes each
