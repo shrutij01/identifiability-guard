@@ -24,6 +24,7 @@ class E2ElementwiseNonlinear(BaseEncoder):
         d: int,
         nonlinear_fns: Optional[List[Callable[[np.ndarray], np.ndarray]]] = None,
         permute: bool = True,
+        nonlinearity_strength: float = 1.0,
         seed: Optional[int] = None,
     ):
         """
@@ -34,11 +35,18 @@ class E2ElementwiseNonlinear(BaseEncoder):
             nonlinear_fns: List of d invertible nonlinear functions. 
                 If None, uses a mix of default invertible functions.
             permute: Whether to apply a random permutation.
+            nonlinearity_strength: Strength of nonlinearity in [0, 1].
+                0 = identity (linear), 1 = fully nonlinear.
+                Interpolates as: f(x) = (1-α)*x + α*h(x).
             seed: Optional random seed for reproducibility.
         """
         super().__init__(d=d, m=d, seed=seed)
         self.permute = permute
         self.nonlinear_fns = nonlinear_fns
+        
+        if not 0.0 <= nonlinearity_strength <= 1.0:
+            raise ValueError(f"nonlinearity_strength must be in [0, 1], got {nonlinearity_strength}")
+        self.nonlinearity_strength = nonlinearity_strength
         
         # Parameters to be initialized
         self.permutation: Optional[np.ndarray] = None
@@ -83,7 +91,12 @@ class E2ElementwiseNonlinear(BaseEncoder):
         # Apply permutation then nonlinear functions
         Z_permuted = Z[:, self.permutation]
         Z_hat = np.zeros_like(Z_permuted)
+        
+        # Apply nonlinearity with strength parameter
+        # f(x) = (1 - α) * x + α * h(x), where α = nonlinearity_strength
+        alpha = self.nonlinearity_strength
         for j in range(self.d):
-            Z_hat[:, j] = self._functions[j](Z_permuted[:, j])
+            h_x = self._functions[j](Z_permuted[:, j])
+            Z_hat[:, j] = (1 - alpha) * Z_permuted[:, j] + alpha * h_x
         
         return Z_hat
