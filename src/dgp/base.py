@@ -49,13 +49,13 @@ class BaseDGP(ABC):
     def _get_default_nonlinear_invertible_functions() -> List[Callable[[np.ndarray], np.ndarray]]:
         """Return a list of default invertible nonlinear functions."""
         return [
-            lambda x: np.tanh(x),                       # tanh (invertible)
-            lambda x: np.sinh(x),                       # sinh (invertible)
-            lambda x: np.sign(x) * np.abs(x) ** 0.5,    # signed sqrt (invertible)
-            lambda x: x ** 3,                           # cube (invertible)
-            lambda x: x ** 5,                           # fifth power (invertible)
-            lambda x: np.exp(x) - 1,                    # exp - 1 (invertible)
-            lambda x: np.sign(x) * np.log1p(np.abs(x)), # signed log1p
+            lambda x: np.tanh(2 * x ** 3 - 0.1),                # tanh (invertible)
+            lambda x: np.sinh(2 * x ** 3 + 0.1),                # sinh (invertible)
+            lambda x: np.sign(x) * np.abs(x) ** 0.5,            # signed sqrt (invertible)
+            lambda x: x ** 3,                                   # cube (invertible)
+            lambda x: x ** 5,                                   # fifth power (invertible)
+            lambda x: np.exp(x),                                # exp (invertible)
+            lambda x: np.sign(x) * np.log1p(np.abs(3 * x + 1)), # signed log1p
         ]
     
     def reset_rng(self, seed: Optional[int] = None) -> None:
