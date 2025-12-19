@@ -91,7 +91,7 @@ encoder_e2 = E2ElementwiseNonlinear(d=5, nonlinearity_strength=0.5, seed=42)
 Z_hat_e2 = encoder_e2.encode(Z)
 
 # New: Parameterized redundancy strength (noise in redundant factors)
-dgp_d4 = D4MultiRedundant(d=5, r=1, redundancy_strength=0.1, seed=42)
+dgp_d4 = D4MultiRedundant(d=5, r=1, noise_std=0.1, seed=42)
 Z_d4 = dgp_d4.sample(1000)
 ```
 

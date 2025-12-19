@@ -154,15 +154,12 @@ class TestD4MultiRedundant:
         """Test that d < 3 raises error."""
         with pytest.raises(ValueError):
             D4MultiRedundant(d=2)
-    
-    def test_redundancy_strength_parameter(self):
-        """Test redundancy_strength parameter (alias for noise_std)."""
-        dgp = D4MultiRedundant(d=4, r=1, redundancy_strength=0.5, seed=42)
-        assert dgp.redundancy_strength == 0.5
-        assert dgp.noise_std == 0.5
+
+    def test_noise_in_redundancy(self):
+        """Test redundancy with noise."""
+        dgp = D4MultiRedundant(d=4, r=1, noise_std=0.1, seed=42)
+        Z = dgp.sample(1000)
         
-        # Verify it adds noise
-        Z = dgp.sample(100)
-        # With noise, Z[:, 2] should be approximately Z[:, 0] * Z[:, 1], but not exact
-        diff = np.abs(Z[:, 2] - Z[:, 0] * Z[:, 1])
-        assert np.mean(diff) > 0.1  # Should have noticeable difference
+        # Correlation should be high but not perfect (default fn is product)
+        corr = np.corrcoef(Z[:, 0] * Z[:, 1], Z[:, 2])[0, 1]
+        assert 0.9 < corr < 1.0

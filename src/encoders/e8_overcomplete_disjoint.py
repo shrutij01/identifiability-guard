@@ -27,6 +27,7 @@ class E8OvercompleteDisjoint(BaseEncoder):
         self,
         d: int,
         codes_per_factor: int = 2,
+        threshold_mode: str = "random",
         seed: Optional[int] = None,
     ):
         """
@@ -47,21 +48,35 @@ class E8OvercompleteDisjoint(BaseEncoder):
         
         # Parameters to be initialized
         self.permutation: Optional[np.ndarray] = None
+        self.threshold_mode = threshold_mode
     
     def _initialize_parameters(self) -> None:
         """Initialize random permutation of factors."""
         # Apply a random permutation to factors for variety
         self.permutation = self._rng.permutation(self.d)
+
+        if self.threshold_mode == "random":
+            self.thresholds = [
+                    np.sort(np.concatenate(([0.0, 1.0], self._rng.random(self.codes_per_factor - 1))))
+                    for _ in range(self.d)
+                ]
+        elif self.threshold_mode == "uniform":
+            self.thresholds = [
+                np.linspace(0.0, 1.0, self.codes_per_factor + 1)
+                for _ in range(self.d)
+            ]
+        
         self._initialized = True
     
     def encode(self, Z: np.ndarray) -> np.ndarray:
-        """
+        r"""
         Apply overcomplete disjoint nonlinear transformation.
         
         For codes_per_factor=2 (default), uses sin/cos encoding:
-            Ẑ[2i] = sin(Z[π(i)])
-            Ẑ[2i+1] = cos(Z[π(i)])
-        
+            $$
+            \hat{Z}_{2i} = \sin\big(Z_{\pi(i)}\big),
+            \hat{Z}_{2i+1} = \cos\big(Z_{\pi(i)}\big)
+            $$ 
         For codes_per_factor > 2, uses a mix of nonlinear functions.
         
         Args:
@@ -90,20 +105,20 @@ class E8OvercompleteDisjoint(BaseEncoder):
                 Z_hat[:, 2*i] = np.sin(Z_permuted[:, i])
                 Z_hat[:, 2*i+1] = np.cos(Z_permuted[:, i])
         else:
-            # Use a variety of nonlinear functions
-            functions = [
-                np.sin,
-                np.cos,
-                lambda x: np.tanh(x),
-                lambda x: np.sign(x) * np.sqrt(np.abs(x)),
-                lambda x: x**3 / (1 + np.abs(x**2)),  # Bounded cubic
-                lambda x: np.sinh(x) / (1 + np.abs(x)),  # Bounded sinh
-            ]
+            # Use interval-based encoding for codes_per_factor > 2
+            Z_sig = 1 / (1 + np.exp(-Z_permuted))
+            
+            if not hasattr(self, "thresholds") or self.thresholds is None:
+                self.thresholds = [
+                    np.sort(np.concatenate(([0.0, 1.0], self._rng.random(self.codes_per_factor - 1))))
+                    for _ in range(self.d)
+                ]
             
             for i in range(self.d):
+                t = self.thresholds[i]
                 for k in range(self.codes_per_factor):
-                    fn = functions[k % len(functions)]
-                    Z_hat[:, i * self.codes_per_factor + k] = fn(Z_permuted[:, i])
+                    mask = (Z_sig[:, i] > t[k]) & (Z_sig[:, i] <= t[k+1])
+                    Z_hat[mask, i * self.codes_per_factor + k] = Z_permuted[mask, i]
         
         return Z_hat
     
@@ -136,10 +151,12 @@ class E8OvercompleteDisjoint(BaseEncoder):
                 cos_val = Z_hat[:, 2*i+1]
                 Z_reconstructed[:, i] = np.arctan2(sin_val, cos_val)
         else:
-            # For other encodings, use the first code as a rough approximation
-            # (not guaranteed to be accurate)
+            # For interval-based encoding, reconstruct by taking the encoded value
+            # from the active interval for each factor
             for i in range(self.d):
-                Z_reconstructed[:, i] = Z_hat[:, i * self.codes_per_factor]
+                for k in range(self.codes_per_factor):
+                    mask = Z_hat[:, i * self.codes_per_factor + k] != 0
+                    Z_reconstructed[mask, i] = Z_hat[mask, i * self.codes_per_factor + k]
         
         # Undo permutation
         Z_unpermuted = np.zeros_like(Z_reconstructed)
