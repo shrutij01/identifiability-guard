@@ -29,6 +29,11 @@ from .mcc import MCCMetric
 from .r2 import R2Metric
 from .registry import MetricRegistry
 
+# Aliases for convenience
+DCI = DCIMetric
+MCC = MCCMetric
+R2 = R2Metric
+
 __all__ = [
     # Core classes
     "BaseMetric",
@@ -37,6 +42,10 @@ __all__ = [
     "DCIMetric",
     "MCCMetric",
     "R2Metric",
+    # Aliases
+    "DCI",
+    "MCC",
+    "R2",
     # Registry
     "MetricRegistry",
 ]
