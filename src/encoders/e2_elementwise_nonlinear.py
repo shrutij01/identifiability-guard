@@ -25,6 +25,7 @@ class E2ElementwiseNonlinear(BaseEncoder):
         nonlinear_fns: Optional[List[Callable[[np.ndarray], np.ndarray]]] = None,
         permute: bool = True,
         nonlinearity_strength: float = 1.0,
+        scale_range: tuple = (0.5, 2.0),
         seed: Optional[int] = None,
     ):
         """
@@ -51,6 +52,10 @@ class E2ElementwiseNonlinear(BaseEncoder):
         # Parameters to be initialized
         self.permutation: Optional[np.ndarray] = None
         self._functions: Optional[List[Callable]] = None
+
+        # To test different non-linearity strengths, when strength < 1.0
+        self.scale_range = scale_range
+        self.scales: Optional[np.ndarray] = None
         
     def _initialize_parameters(self) -> None:
         """Initialize permutation and select nonlinear functions."""
@@ -70,6 +75,11 @@ class E2ElementwiseNonlinear(BaseEncoder):
             default_fns = self._get_default_nonlinear_invertible_functions()
             self._functions = [default_fns[i % len(default_fns)] for i in range(self.d)]
         
+        # Random scaling factors (non-zero)
+        self.scales = self._rng.uniform(
+            self.scale_range[0], self.scale_range[1], size=self.d
+        )
+
         self._initialized = True
     
     def encode(self, Z: np.ndarray) -> np.ndarray:
@@ -97,6 +107,6 @@ class E2ElementwiseNonlinear(BaseEncoder):
         alpha = self.nonlinearity_strength
         for j in range(self.d):
             h_x = self._functions[j](Z_permuted[:, j])
-            Z_hat[:, j] = (1 - alpha) * Z_permuted[:, j] + alpha * h_x
+            Z_hat[:, j] = (1 - alpha) * (self.scales[j] * Z_permuted[:, j]) + alpha * h_x
         
         return Z_hat
