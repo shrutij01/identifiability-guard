@@ -32,6 +32,7 @@ class D4MultiRedundant(BaseDGP):
         
         Args:
             d: Number of latent factors (must be >= 3).
+            r: Number of redundant factors (defaults to sqrt(d)).
             redundant_fn: Function $g:\mathbb{R}^{d-r} \to \mathbb{R}^r$ that maps $d-r$ source factors to the $r$
                 redundant factor. Defaults to $g_{d-r+i}(x_1, \ldots, x_{d-r}) = x_i * \sum_{j \neq i} x_j$.
             noise_std: Standard deviation of optional noise added to the
@@ -64,7 +65,7 @@ class D4MultiRedundant(BaseDGP):
             self.redundant_fns = [default_fns[i % len(default_fns)] for i in range(self.r)]
         
         self.noise_std = noise_std
-    
+        
     @staticmethod
     def _get_default_bivariate_functions() -> List[Callable[[np.ndarray, np.ndarray], np.ndarray]]:
         """Return a list of default bivariate nonlinear functions."""

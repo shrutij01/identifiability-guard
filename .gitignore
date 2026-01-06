@@ -112,3 +112,4 @@ venv.bak/
 CLAUDE.md
 instruction_pile.md
 test_results/
+results/

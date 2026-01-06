@@ -45,6 +45,10 @@ from src.encoders import (
     E4UndercompleteLinear,
     E5OvercompleteLinear,
     E6OvercompleteMulticodes,
+    E7OvercompleteEntangled,
+    E8OvercompleteDisjoint,
+    E9RandomGaussian,
+    E10RandomUniform,
 )
 
 
@@ -63,6 +67,10 @@ ENCODER_OPTIONS = {
     "e4": ("E4: Undercomplete Linear", E4UndercompleteLinear),
     "e5": ("E5: Overcomplete Linear", E5OvercompleteLinear),
     "e6": ("E6: Overcomplete Multicodes", E6OvercompleteMulticodes),
+    "e7": ("E7: Overcomplete Entangled", E7OvercompleteEntangled),
+    "e8": ("E8: Overcomplete Disjoint", E8OvercompleteDisjoint),
+    "e9": ("E9: Random Gaussian", E9RandomGaussian),
+    "e10": ("E10: Random Uniform", E10RandomUniform),
 }
 
 
