@@ -19,10 +19,8 @@ Usage:
 import sys
 import os
 import argparse
-import json
-import csv
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Set
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -31,19 +29,19 @@ import matplotlib as mpl
 # Add parent directory to path to import src modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.dgp import D1Independent, D2Correlated, D3SingleRedundant, D4MultiRedundant
-from src.encoders import (
-    E1ElementwiseLinear,
-    E2ElementwiseNonlinear,
-    E3LinearlyEntangled,
-    E7OvercompleteEntangled,
-    E8OvercompleteDisjoint,
-)
 from src.metrics import MetricRegistry
 from src.evaluation import (
     sensitivity_analysis_1d,
     compute_sensitivity_statistics,
     save_sensitivity_results,
+    DGP_CLASSES,
+    ENCODER_CLASSES,
+    ALL_METRICS,
+    DEFAULT_METRICS,
+    METRIC_DISPLAY_NAMES,
+    create_dgp_with_params,
+    create_encoder_with_params,
+    extract_metric_scores,
 )
 
 
@@ -68,9 +66,15 @@ def setup_plot_style():
     mpl.rcParams['lines.markersize'] = 6
 
 
-def evaluate_dgp_encoder_combination(params: Dict[str, Any]) -> Dict[str, float]:
+def evaluate_dgp_encoder_combination(
+    params: Dict[str, Any],
+    metrics_to_compute: Optional[Set[str]] = None,
+) -> Dict[str, float]:
     """
     Evaluate a single DGP/encoder combination with given parameters.
+    
+    This function uses the shared helpers from src.evaluation for DGP/encoder
+    creation and metric extraction.
     
     Args:
         params: Dictionary with keys:
@@ -80,10 +84,15 @@ def evaluate_dgp_encoder_combination(params: Dict[str, Any]) -> Dict[str, float]
             - n_factors: Number of factors
             - seed: Random seed
             - Additional DGP/encoder-specific parameters
+        metrics_to_compute: Set of metric names to compute. If None, uses DEFAULT_METRICS.
+            Use set(ALL_METRICS.keys()) for all metrics.
     
     Returns:
         Dictionary of metric scores.
     """
+    if metrics_to_compute is None:
+        metrics_to_compute = DEFAULT_METRICS
+    
     # Extract parameters
     dgp_name = params['dgp']
     encoder_name = params['encoder']
@@ -91,87 +100,20 @@ def evaluate_dgp_encoder_combination(params: Dict[str, Any]) -> Dict[str, float]
     n_factors = params['n_factors']
     seed = params['seed']
     
-    # Map names to classes
-    dgp_classes = {
-        'D1': D1Independent,
-        'D2': D2Correlated,
-        'D3': D3SingleRedundant,
-        'D4': D4MultiRedundant,
-    }
-    
-    encoder_classes = {
-        'E1': E1ElementwiseLinear,
-        'E2': E2ElementwiseNonlinear,
-        'E3': E3LinearlyEntangled,
-        'E7': E7OvercompleteEntangled,
-        'E8': E8OvercompleteDisjoint,
-    }
-    
-    # Create DGP
-    dgp_cls = dgp_classes[dgp_name]
-    dgp_kwargs = {'d': n_factors, 'seed': seed}
-    
-    # Add DGP-specific parameters
-    if dgp_name == 'D2' and 'correlation' in params:
-        dgp_kwargs['correlation'] = params['correlation']
-    if dgp_name == 'D4':
-        if 'redundancy_strength' in params:
-            dgp_kwargs['redundancy_strength'] = params['redundancy_strength']
-        if 'r' in params:
-            dgp_kwargs['r'] = params['r']
-        else:
-            # Set r=1 by default for D4 to avoid constraint issues
-            dgp_kwargs['r'] = 1
-    
-    dgp = dgp_cls(**dgp_kwargs)
+    # Create DGP and encoder using shared helpers
+    dgp = create_dgp_with_params(dgp_name, n_factors, seed, params)
     Z = dgp.sample(n_samples)
     
-    # Create encoder
-    encoder_cls = encoder_classes[encoder_name]
-    encoder_kwargs = {'d': n_factors, 'seed': seed}
-    
-    # Add encoder-specific parameters
-    if encoder_name == 'E2' and 'nonlinearity_strength' in params:
-        encoder_kwargs['nonlinearity_strength'] = params['nonlinearity_strength']
-    if encoder_name == 'E3' and 'condition_number' in params:
-        encoder_kwargs['condition_number'] = params['condition_number']
-    if encoder_name == 'E7':
-        if 'condition_number' in params:
-            encoder_kwargs['condition_number'] = params['condition_number']
-        if 'm' in params:
-            encoder_kwargs['m'] = params['m']
-    if encoder_name == 'E8' and 'codes_per_factor' in params:
-        encoder_kwargs['codes_per_factor'] = params['codes_per_factor']
-    
-    encoder = encoder_cls(**encoder_kwargs)
+    encoder = create_encoder_with_params(encoder_name, n_factors, seed, params)
     Z_hat = encoder.encode(Z)
     
     # Compute metrics
     registry = MetricRegistry()
     registry.register_defaults()
-    
     all_results = registry.compute_all(Z, Z_hat)
     
-    # Extract scores
-    results = {}
-    
-    # DCI subscores
-    if 'dci' in all_results:
-        dci_result = all_results['dci']
-        results['dci_disentanglement'] = dci_result.subscores.get('disentanglement', np.nan)
-        results['dci_completeness'] = dci_result.subscores.get('completeness', np.nan)
-        results['dci_informativeness'] = dci_result.subscores.get('informativeness_test', np.nan)
-    
-    # MCC variants
-    for mcc_type in ['mcc_pearson', 'mcc_spearman', 'mcc_rdc']:
-        if mcc_type in all_results:
-            results[mcc_type] = all_results[mcc_type].primary_score
-    
-    # R²
-    if 'r2' in all_results:
-        results['r2'] = all_results['r2'].primary_score
-    
-    return results
+    # Extract scores using shared helper
+    return extract_metric_scores(all_results, metrics_to_compute)
 
 
 def sweep_samples(
@@ -182,6 +124,7 @@ def sweep_samples(
     n_seeds: int,
     base_seed: int,
     output_dir: Path,
+    metrics_to_compute: Optional[Set[str]] = None,
 ):
     """Run sensitivity analysis sweeping over number of samples."""
     print("\n" + "=" * 80)
@@ -193,7 +136,7 @@ def sweep_samples(
         params['dgp'] = dgp
         params['encoder'] = encoder
         params['n_factors'] = n_factors
-        return evaluate_dgp_encoder_combination(params)
+        return evaluate_dgp_encoder_combination(params, metrics_to_compute)
     
     param_values, metric_results = sensitivity_analysis_1d(
         eval_fn,
@@ -234,6 +177,7 @@ def sweep_factors(
     n_seeds: int,
     base_seed: int,
     output_dir: Path,
+    metrics_to_compute: Optional[Set[str]] = None,
 ):
     """Run sensitivity analysis sweeping over number of factors."""
     print("\n" + "=" * 80)
@@ -245,7 +189,7 @@ def sweep_factors(
         params['dgp'] = dgp
         params['encoder'] = encoder
         params['n_samples'] = n_samples
-        return evaluate_dgp_encoder_combination(params)
+        return evaluate_dgp_encoder_combination(params, metrics_to_compute)
     
     param_values, metric_results = sensitivity_analysis_1d(
         eval_fn,
@@ -286,6 +230,7 @@ def sweep_correlation(
     n_seeds: int,
     base_seed: int,
     output_dir: Path,
+    metrics_to_compute: Optional[Set[str]] = None,
 ):
     """Run sensitivity analysis sweeping over correlation (D2 only)."""
     dgp = 'D2'
@@ -299,7 +244,7 @@ def sweep_correlation(
         params['encoder'] = encoder
         params['n_samples'] = n_samples
         params['n_factors'] = n_factors
-        return evaluate_dgp_encoder_combination(params)
+        return evaluate_dgp_encoder_combination(params, metrics_to_compute)
     
     param_values, metric_results = sensitivity_analysis_1d(
         eval_fn,
@@ -340,6 +285,7 @@ def sweep_nonlinearity(
     n_seeds: int,
     base_seed: int,
     output_dir: Path,
+    metrics_to_compute: Optional[Set[str]] = None,
 ):
     """Run sensitivity analysis sweeping over nonlinearity strength (E2 only)."""
     encoder = 'E2'
@@ -353,7 +299,7 @@ def sweep_nonlinearity(
         params['encoder'] = encoder
         params['n_samples'] = n_samples
         params['n_factors'] = n_factors
-        return evaluate_dgp_encoder_combination(params)
+        return evaluate_dgp_encoder_combination(params, metrics_to_compute)
     
     param_values, metric_results = sensitivity_analysis_1d(
         eval_fn,
@@ -391,6 +337,7 @@ def plot_sensitivity(
     param_name: str,
     title: str,
     output_path: Path,
+    metrics_to_plot: Optional[List[str]] = None,
 ):
     """
     Create camera-ready sensitivity plot with error bands.
@@ -400,30 +347,36 @@ def plot_sensitivity(
         param_name: Name of the parameter being varied.
         title: Plot title.
         output_path: Path to save the plot.
+        metrics_to_plot: List of metric names to plot. If None, uses all DEFAULT_METRICS.
     """
     setup_plot_style()
     
-    # Select important metrics to plot
-    important_metrics = [
-        'dci_disentanglement',
-        'dci_completeness',
-        'mcc_pearson',
-        'r2',
-    ]
+    # Select metrics to plot - use DEFAULT_METRICS by default
+    if metrics_to_plot is None:
+        metrics_to_plot = list(DEFAULT_METRICS)
     
-    # Filter to metrics that exist
-    metrics_to_plot = [m for m in important_metrics if m in stats]
+    # Filter to metrics that exist in stats
+    metrics_to_plot = [m for m in metrics_to_plot if m in stats]
     
     if not metrics_to_plot:
         print(f"Warning: No metrics to plot for {output_path}")
         return
     
-    # Create figure
+    # Create figure with appropriate layout for 7 metrics
     n_metrics = len(metrics_to_plot)
-    fig, axes = plt.subplots(1, n_metrics, figsize=(5 * n_metrics, 4))
-    
-    if n_metrics == 1:
-        axes = [axes]
+    # Use 2 rows if more than 4 metrics for better readability
+    if n_metrics > 4:
+        n_cols = 4
+        n_rows = (n_metrics + n_cols - 1) // n_cols
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(4.5 * n_cols, 4 * n_rows))
+        axes = axes.flatten()
+        # Hide unused subplots
+        for idx in range(n_metrics, len(axes)):
+            axes[idx].set_visible(False)
+    else:
+        fig, axes = plt.subplots(1, n_metrics, figsize=(5 * n_metrics, 4))
+        if n_metrics == 1:
+            axes = [axes]
     
     # Plot each metric
     for idx, metric_name in enumerate(metrics_to_plot):
@@ -439,10 +392,11 @@ def plot_sensitivity(
         ax.plot(param_values, means, 'o-', label=metric_name, linewidth=2, markersize=6)
         ax.fill_between(param_values, ci_lowers, ci_uppers, alpha=0.2)
         
-        # Formatting
+        # Formatting - use display name if available
+        display_name = METRIC_DISPLAY_NAMES.get(metric_name, metric_name.replace('_', ' ').title())
         ax.set_xlabel(param_name, fontsize=12)
         ax.set_ylabel('Score', fontsize=12)
-        ax.set_title(metric_name.replace('_', ' ').title(), fontsize=13)
+        ax.set_title(display_name, fontsize=13)
         ax.grid(True, alpha=0.3)
         ax.set_ylim([0, 1.05])
     
@@ -498,7 +452,7 @@ def main():
         '--encoder',
         type=str,
         default='E1',
-        choices=['E1', 'E2', 'E3', 'E7', 'E8'],
+        choices=['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10'],
         help='Encoder to use (default: E1)',
     )
     
@@ -534,7 +488,35 @@ def main():
         help=f'Output directory (default: {DEFAULT_OUTPUT_DIR})',
     )
     
+    # Metrics selection
+    parser.add_argument(
+        '--metrics',
+        type=str,
+        default=None,
+        help=(
+            'Comma-separated list of metrics to compute. '
+            f'Available: {",".join(ALL_METRICS.keys())}. '
+            f'Default (subset): {",".join(DEFAULT_METRICS)}'
+        ),
+    )
+    parser.add_argument(
+        '--all-metrics',
+        action='store_true',
+        help='Compute all available metrics (overrides --metrics)',
+    )
+    
     args = parser.parse_args()
+    
+    # Parse metrics selection
+    if args.all_metrics:
+        metrics_to_compute = set(ALL_METRICS.keys())
+    elif args.metrics:
+        metrics_to_compute = set(m.strip() for m in args.metrics.split(','))
+        invalid_metrics = metrics_to_compute - set(ALL_METRICS.keys())
+        if invalid_metrics:
+            parser.error(f"Invalid metrics: {invalid_metrics}. Available: {list(ALL_METRICS.keys())}")
+    else:
+        metrics_to_compute = DEFAULT_METRICS
     
     # Create output directory
     output_dir = Path(args.output_dir)
@@ -549,6 +531,7 @@ def main():
     print(f"  Default samples: {args.n_samples}")
     print(f"  Default factors: {args.n_factors}")
     print(f"  Seeds per config: {args.n_seeds}")
+    print(f"  Metrics: {sorted(metrics_to_compute)}")
     print(f"  Output directory: {output_dir}")
     print("=" * 80)
     
@@ -563,6 +546,7 @@ def main():
             args.n_seeds,
             args.base_seed,
             output_dir,
+            metrics_to_compute,
         )
     
     if args.sweep_factors:
@@ -575,6 +559,7 @@ def main():
             args.n_seeds,
             args.base_seed,
             output_dir,
+            metrics_to_compute,
         )
     
     if args.sweep_correlation:
@@ -587,6 +572,7 @@ def main():
             args.n_seeds,
             args.base_seed,
             output_dir,
+            metrics_to_compute,
         )
     
     if args.sweep_nonlinearity:
@@ -599,6 +585,7 @@ def main():
             args.n_seeds,
             args.base_seed,
             output_dir,
+            metrics_to_compute,
         )
     
     # If no sweeps specified, show help

@@ -50,9 +50,10 @@ Z_corr = dgp_corr.sample(1000)
 | E3 | Linearly Entangled | Ẑ = A · Z (dense mixing), m = d | ✅ |
 | E4 | Undercomplete Linear | Elementwise scaling, m < d | ✅ |
 | E5 | Overcomplete Linear | Redundant scaled copies, m > d | ✅ |
-| E6 | Overcomplete Multicodes | Multiple nonlinear codes per factor, m > d | 🚧 TODO |
+| E6 | Overcomplete Multicodes | Multiple nonlinear codes per factor, m > d | ✅ |
 | E7 | Overcomplete Linearly Entangled | Ẑ = A · Z (dense, rank-d), m > d | ✅ |
 | E8 | Overcomplete Nonlinear Disjoint | Disjoint sin/cos codes per factor, m > d | ✅ |
+| E9 | Random Gaussian | Random noise (baseline/sanity check), m = d | ✅ |
 
 ### Example Usage
 
@@ -78,19 +79,23 @@ Z_hat = encoder.encode(Z)  # Shape: (1000, 5)
 encoder_ent = E3LinearlyEntangled(d=5, seed=42)
 Z_hat_ent = encoder_ent.encode(Z)
 
-# New: E7 Overcomplete linearly entangled (m > d, dense mixing)
+# E7 Overcomplete linearly entangled (m > d, dense mixing)
 encoder_e7 = E7OvercompleteEntangled(d=5, m=10, condition_number=10.0, seed=42)
 Z_hat_e7 = encoder_e7.encode(Z)  # Shape: (1000, 10)
 
-# New: E8 Overcomplete disjoint (sin/cos encoding per factor)
+# E8 Overcomplete disjoint (sin/cos encoding per factor)
 encoder_e8 = E8OvercompleteDisjoint(d=5, codes_per_factor=2, seed=42)
 Z_hat_e8 = encoder_e8.encode(Z)  # Shape: (1000, 10)
 
-# New: Parameterized nonlinearity strength (0=linear, 1=fully nonlinear)
+# E9 Random Gaussian (baseline/sanity check - should have ~0 metrics)
+encoder_e9 = E9RandomGaussian(d=5, seed=42)
+Z_hat_e9 = encoder_e9.encode(Z)  # Shape: (1000, 5) - random noise
+
+# Parameterized nonlinearity strength (0=linear, 1=fully nonlinear)
 encoder_e2 = E2ElementwiseNonlinear(d=5, nonlinearity_strength=0.5, seed=42)
 Z_hat_e2 = encoder_e2.encode(Z)
 
-# New: Parameterized redundancy strength (noise in redundant factors)
+# Parameterized redundancy strength (noise in redundant factors)
 dgp_d4 = D4MultiRedundant(d=5, r=1, noise_std=0.1, seed=42)
 Z_d4 = dgp_d4.sample(1000)
 ```
@@ -147,7 +152,8 @@ identifiability-guard/
 │   │   ├── e5_overcomplete_linear.py
 │   │   ├── e6_overcomplete_multicodes.py
 │   │   ├── e7_overcomplete_entangled.py   # NEW: E7
-│   │   └── e8_overcomplete_disjoint.py    # NEW: E8
+│   │   ├── e8_overcomplete_disjoint.py    # NEW: E8
+│   │   └── e9_random_gaussian.py          # NEW: E9 (baseline)
 │   ├── evaluation/              # NEW: Evaluation Utilities
 │   │   ├── __init__.py
 │   │   ├── timing.py           # Timing and memory profiling
@@ -241,6 +247,65 @@ python examples/evaluate_sensitivity.py \
 
 # Results are saved as JSON and camera-ready plots
 ```
+
+## Example Scripts
+
+### Combined Heatmap Visualization
+
+Generate a comprehensive heatmap showing all DGP × Encoder combinations:
+
+```bash
+# Basic usage (default: 5000 samples, 4 factors)
+python examples/evaluate_all_combinations_combined.py
+
+# Custom configuration
+python examples/evaluate_all_combinations_combined.py \
+    --samples 10000 \
+    --factors 6 \
+    --seed 123 \
+    --output results/my_heatmap.png
+```
+
+This produces:
+- A multi-panel figure with one heatmap per DGP
+- Each cell shows metric scores (0-100 scale) for encoder × metric combinations  
+- A timing/memory profiling table at the bottom
+- Title includes samples and factors configuration
+
+### Sensitivity Analysis Sweep
+
+Run comprehensive sensitivity analysis with statistical aggregation:
+
+```bash
+# Sample size sweep (all 7 metrics plotted)
+python examples/evaluate_sensitivity.py \
+    --sweep-samples 500,1000,2500,5000,10000 \
+    --dgp D1 --encoder E1 \
+    --n-seeds 10
+
+# Correlation sweep for D2
+python examples/evaluate_sensitivity.py \
+    --sweep-correlation 0.0,0.2,0.4,0.6,0.8,1.0 \
+    --dgp D2 --encoder E2 \
+    --n-seeds 5
+
+# Select specific metrics to compute (faster)
+python examples/evaluate_sensitivity.py \
+    --sweep-samples 1000,5000,10000 \
+    --metrics dci_disentanglement,mcc_pearson,r2 \
+    --n-seeds 5
+
+# Run all metrics
+python examples/evaluate_sensitivity.py \
+    --sweep-samples 1000,5000,10000 \
+    --all-metrics \
+    --n-seeds 5
+```
+
+Output includes:
+- JSON files with raw results and statistics
+- Camera-ready sensitivity plots with 95% CI error bands
+- Support for 7 metrics: DCI (3 subscores), MCC (3 variants), R²
 
 ## Running Tests
 
