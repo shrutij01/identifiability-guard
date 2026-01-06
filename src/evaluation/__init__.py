@@ -5,6 +5,7 @@ Provides tools for:
 - Timing and memory profiling (timing.py)
 - Multi-seed evaluations with statistics (multi_seed.py)
 - Sensitivity analysis and parameter sweeps (sensitivity.py)
+- Shared evaluation helpers (helpers.py)
 """
 
 from .timing import (
@@ -33,6 +34,21 @@ from .sensitivity import (
     load_sensitivity_results,
 )
 
+from .helpers import (
+    DGP_CLASSES,
+    ENCODER_CLASSES,
+    ALL_METRICS,
+    METRIC_DISPLAY_NAMES,
+    DEFAULT_METRICS,
+    get_dgp_class,
+    get_encoder_class,
+    extract_metric_scores,
+    sanitize_array,
+    evaluate_combination,
+    create_dgp_with_params,
+    create_encoder_with_params,
+)
+
 __all__ = [
     # Timing utilities
     "time_block",
@@ -54,4 +70,17 @@ __all__ = [
     "compute_sensitivity_statistics",
     "save_sensitivity_results",
     "load_sensitivity_results",
+    # Shared helpers
+    "DGP_CLASSES",
+    "ENCODER_CLASSES",
+    "ALL_METRICS",
+    "METRIC_DISPLAY_NAMES",
+    "DEFAULT_METRICS",
+    "get_dgp_class",
+    "get_encoder_class",
+    "extract_metric_scores",
+    "sanitize_array",
+    "evaluate_combination",
+    "create_dgp_with_params",
+    "create_encoder_with_params",
 ]

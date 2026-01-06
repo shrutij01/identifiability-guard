@@ -12,6 +12,8 @@ from src.encoders import (
     E6OvercompleteMulticodes,
     E7OvercompleteEntangled,
     E8OvercompleteDisjoint,
+    E9RandomGaussian,
+    E10RandomUniform,
 )
 
 
@@ -365,3 +367,96 @@ class TestE8OvercompleteDisjoint:
         Z = np.random.randn(50, 3)
         Z_hat = encoder.encode(Z)
         assert Z_hat.shape == (50, 12)  # 3 factors * 4 codes each
+
+
+class TestE9RandomGaussian:
+    """Tests for E9 random Gaussian encoder (baseline)."""
+    
+    def test_basic_encoding(self):
+        """Test basic encoding produces output of correct shape."""
+        encoder = E9RandomGaussian(d=5, seed=42)
+        Z = np.random.randn(100, 5)
+        Z_hat = encoder.encode(Z)
+        assert Z_hat.shape == (100, 5)
+    
+    def test_output_is_random(self):
+        """Test that output is independent of input."""
+        encoder = E9RandomGaussian(d=3, seed=42)
+        Z1 = np.random.randn(50, 3)
+        Z2 = np.random.randn(50, 3) * 10  # Very different input
+        
+        # Reset seed to get same random output
+        encoder = E9RandomGaussian(d=3, seed=42)
+        Z_hat1 = encoder.encode(Z1)
+        
+        encoder = E9RandomGaussian(d=3, seed=42)
+        Z_hat2 = encoder.encode(Z2)
+        
+        # Same seed should produce same output regardless of input
+        np.testing.assert_array_equal(Z_hat1, Z_hat2)
+    
+    def test_different_seeds_produce_different_output(self):
+        """Test that different seeds produce different outputs."""
+        Z = np.random.randn(50, 3)
+        
+        encoder1 = E9RandomGaussian(d=3, seed=42)
+        Z_hat1 = encoder1.encode(Z)
+        
+        encoder2 = E9RandomGaussian(d=3, seed=123)
+        Z_hat2 = encoder2.encode(Z)
+        
+        # Different seeds should produce different outputs
+        assert not np.allclose(Z_hat1, Z_hat2)
+    
+    def test_output_statistics(self):
+        """Test that output has approximately standard Gaussian statistics."""
+        encoder = E9RandomGaussian(d=5, seed=42)
+        Z = np.random.randn(10000, 5)
+        Z_hat = encoder.encode(Z)
+        
+        # Check that output is approximately N(0, 1)
+        assert np.abs(Z_hat.mean()) < 0.1
+        assert np.abs(Z_hat.std() - 1.0) < 0.1
+    
+    def test_no_correlation_with_input(self):
+        """Test that output is uncorrelated with input."""
+        encoder = E9RandomGaussian(d=3, seed=42)
+        Z = np.random.randn(1000, 3)
+        Z_hat = encoder.encode(Z)
+        
+        # Compute correlation between input and output
+        for i in range(3):
+            corr = np.corrcoef(Z[:, i], Z_hat[:, i])[0, 1]
+            assert np.abs(corr) < 0.1  # Should be near zero
+
+
+class TestE10RandomUniform:
+    """Tests for E10 random uniform encoder (baseline)."""
+
+    def test_basic_encoding(self):
+        """Outputs correct shape regardless of input."""
+        encoder = E10RandomUniform(d=4, seed=7)
+        Z = np.random.randn(20, 4)
+        Z_hat = encoder.encode(Z)
+        assert Z_hat.shape == (20, 4)
+
+    def test_values_within_bounds(self):
+        """Samples stay within configured uniform range."""
+        encoder = E10RandomUniform(d=2, low=-1.5, high=0.5, seed=3)
+        Z = np.zeros((1000, 2))
+        Z_hat = encoder.encode(Z)
+        assert np.all(Z_hat >= -1.5)
+        assert np.all(Z_hat <= 0.5)
+
+    def test_seed_reproducibility(self):
+        """Same seed yields identical draws regardless of input."""
+        Z1 = np.random.randn(10, 3)
+        Z2 = np.random.randn(10, 3) * 10
+
+        enc1 = E10RandomUniform(d=3, seed=11)
+        out1 = enc1.encode(Z1)
+
+        enc2 = E10RandomUniform(d=3, seed=11)
+        out2 = enc2.encode(Z2)
+
+        np.testing.assert_array_equal(out1, out2)
