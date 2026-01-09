@@ -3,6 +3,7 @@ Evaluate all combinations of DGPs and Encoders - Combined Visualization.
 
 This script creates a single combined figure showing all encoder-metric 
 combinations for each DGP, similar to the provided example image format.
+Includes timing/memory profiling information.
 
 Usage:
     python examples/evaluate_all_combinations_combined.py [--samples N] [--factors D] [--seed S]
@@ -21,59 +22,37 @@ Usage:
 Output:
     - Creates a single figure with one heatmap per DGP
     - Each heatmap shows Encoders (rows) × Metrics (columns)
+    - Includes timing/memory profiling table
     - Saves figure as PNG file
 """
 
 import sys
 import os
 import argparse
+import time
+import tracemalloc
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 # Add parent directory to path to import src modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.metrics import MetricRegistry
-from src.dgp import D1Independent, D2Correlated, D3SingleRedundant, D4MultiRedundant
-from src.encoders import (
-    E1ElementwiseLinear,
-    E2ElementwiseNonlinear,
-    E3LinearlyEntangled,
-    E4UndercompleteLinear,
-    E5OvercompleteLinear,
-    E6OvercompleteMulticodes,
+from src.evaluation import (
+    DGP_CLASSES,
+    ENCODER_CLASSES,
+    METRIC_DISPLAY_NAMES,
+    extract_metric_scores,
+    get_dgp_class,
+    get_encoder_class,
+    sanitize_array,
 )
 
 
-# Configuration: All DGPs and Encoders
-DGP_CLASSES = {
-    "D1": D1Independent,
-    "D2": D2Correlated,
-    "D3": D3SingleRedundant,
-    "D4": D4MultiRedundant,
-}
-
-ENCODER_CLASSES = {
-    "E1": E1ElementwiseLinear,
-    "E2": E2ElementwiseNonlinear,
-    "E3": E3LinearlyEntangled,
-    "E4": E4UndercompleteLinear,
-    "E5": E5OvercompleteLinear,
-    "E6": E6OvercompleteMulticodes,
-}
-
 # Metrics to evaluate - ALL metrics including DCI subscores
-METRIC_NAMES = {
-    "dci_disentanglement": "DCI-D",
-    "dci_completeness": "DCI-C",
-    "dci_informativeness": "DCI-I",
-    "mcc_pearson": "MCC-P",
-    "mcc_spearman": "MCC-S",
-    "mcc_rdc": "MCC-RDC",
-    "r2": "R²",
-}
+METRIC_NAMES = METRIC_DISPLAY_NAMES
 
 
 def evaluate_combination(
@@ -83,52 +62,98 @@ def evaluate_combination(
     n_factors: int,
     seed: int,
     registry: MetricRegistry,
-) -> Dict[str, float]:
-    """Evaluate one DGP/encoder combination on all metrics."""
-    dgp_cls = DGP_CLASSES[dgp_name]
+) -> Tuple[Dict[str, float], Dict[str, Tuple[float, float]]]:
+    """
+    Evaluate one DGP/encoder combination on all metrics using shared helpers.
+    
+    Returns:
+        Tuple of:
+        - results_dict: metric_name -> score
+        - metric_timing: metric_name -> (time_seconds, memory_mb)
+    """
+    dgp_cls = get_dgp_class(dgp_name)
     dgp = dgp_cls(d=n_factors, seed=seed)
     Z = dgp.sample(n_samples)
 
-    encoder_cls = ENCODER_CLASSES[encoder_name]
+    encoder_cls = get_encoder_class(encoder_name)
     encoder = encoder_cls(d=n_factors, seed=seed)
     Z_hat = encoder.encode(Z)
+    
+    # Sanitize arrays to prevent NaN/Inf errors
+    Z = sanitize_array(Z)
+    Z_hat = sanitize_array(Z_hat)
 
-    # Compute ALL metrics using registry.compute_all
-    all_results = registry.compute_all(Z, Z_hat)
+    # Compute each metric individually to track timing per metric
+    results = {}
+    metric_timing = {}
     
-    # Initialize results with NaN for all metrics
-    results = {key: np.nan for key in METRIC_NAMES.keys()}
+    # DCI (computes 3 subscores together)
+    tracemalloc.start()
+    start_time = time.perf_counter()
+    try:
+        dci_metric = registry.create('dci')
+        dci_result = dci_metric.compute(Z, Z_hat)
+        results['dci_disentanglement'] = dci_result.subscores.get('disentanglement', np.nan)
+        results['dci_completeness'] = dci_result.subscores.get('completeness', np.nan)
+        results['dci_informativeness'] = dci_result.subscores.get('informativeness_test', np.nan)
+    except Exception:
+        results['dci_disentanglement'] = np.nan
+        results['dci_completeness'] = np.nan
+        results['dci_informativeness'] = np.nan
+    dci_time = time.perf_counter() - start_time
+    _, dci_peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    dci_memory = dci_peak / (1024 * 1024)
+    # DCI time/memory is shared by all 3 subscores (divide by 3 for per-metric average)
+    metric_timing['dci_disentanglement'] = (dci_time / 3, dci_memory / 3)
+    metric_timing['dci_completeness'] = (dci_time / 3, dci_memory / 3)
+    metric_timing['dci_informativeness'] = (dci_time / 3, dci_memory / 3)
     
-    # Extract DCI subscores if available
-    if "dci" in all_results:
-        dci_result = all_results["dci"]
-        results["dci_disentanglement"] = dci_result.subscores["disentanglement"]
-        results["dci_completeness"] = dci_result.subscores["completeness"]
-        results["dci_informativeness"] = dci_result.subscores["informativeness_test"]
+    # MCC variants (each computed separately)
+    for mcc_variant in ['pearson', 'spearman', 'rdc']:
+        metric_key = f'mcc_{mcc_variant}'
+        tracemalloc.start()
+        start_time = time.perf_counter()
+        try:
+            mcc_metric = registry.create(metric_key)
+            mcc_result = mcc_metric.compute(Z, Z_hat)
+            results[metric_key] = mcc_result.primary_score
+        except Exception:
+            results[metric_key] = np.nan
+        elapsed = time.perf_counter() - start_time
+        _, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        metric_timing[metric_key] = (elapsed, peak / (1024 * 1024))
     
-    # Extract MCC and R² primary scores if available
-    if "mcc_pearson" in all_results:
-        results["mcc_pearson"] = all_results["mcc_pearson"].primary_score
-    if "mcc_spearman" in all_results:
-        results["mcc_spearman"] = all_results["mcc_spearman"].primary_score
-    if "mcc_rdc" in all_results:
-        results["mcc_rdc"] = all_results["mcc_rdc"].primary_score
-    if "r2" in all_results:
-        results["r2"] = all_results["r2"].primary_score
-
-    return results
+    # R²
+    tracemalloc.start()
+    start_time = time.perf_counter()
+    try:
+        r2_metric = registry.create('r2')
+        r2_result = r2_metric.compute(Z, Z_hat)
+        results['r2'] = r2_result.primary_score
+    except Exception:
+        results['r2'] = np.nan
+    elapsed = time.perf_counter() - start_time
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    metric_timing['r2'] = (elapsed, peak / (1024 * 1024))
+    
+    return results, metric_timing
 
 
 def evaluate_all_combinations(
     n_samples: int = 5000,
     n_factors: int = 4,
     seed: int = 42,
-) -> Dict[str, Dict[str, Dict[str, float]]]:
+) -> Tuple[Dict[str, Dict[str, Dict[str, float]]], Dict[str, List[Tuple[float, float]]]]:
     """
     Evaluate all DGP/encoder combinations.
 
     Returns:
-        Nested dictionary: dgp -> encoder -> metric -> score
+        Tuple of:
+        - Nested dictionary: dgp -> encoder -> metric -> score
+        - Metric timing dictionary: metric_name -> list of (time, memory) tuples across all combinations
     """
     print("=" * 80)
     print("EVALUATING ALL DGP/ENCODER COMBINATIONS")
@@ -147,6 +172,8 @@ def evaluate_all_combinations(
 
     # Store results: dgp -> encoder -> metric -> score
     all_results = {dgp: {} for dgp in DGP_CLASSES.keys()}
+    # Store timing per metric: metric_name -> list of (time, memory) tuples
+    metric_timing_all = {metric: [] for metric in METRIC_NAMES.keys()}
 
     total_combinations = len(DGP_CLASSES) * len(ENCODER_CLASSES)
     current = 0
@@ -157,7 +184,7 @@ def evaluate_all_combinations(
             print(f"[{current}/{total_combinations}] Evaluating {dgp_name} × {encoder_name}...", end=" ")
 
             try:
-                results = evaluate_combination(
+                results, metric_timing = evaluate_combination(
                     dgp_name=dgp_name,
                     encoder_name=encoder_name,
                     n_samples=n_samples,
@@ -166,7 +193,11 @@ def evaluate_all_combinations(
                     registry=registry,
                 )
                 all_results[dgp_name][encoder_name] = results
-                print("✓")
+                # Accumulate timing per metric
+                for metric_name, timing in metric_timing.items():
+                    metric_timing_all[metric_name].append(timing)
+                total_time = sum(t for t, _ in metric_timing.values())
+                print(f"✓ ({total_time:.2f}s)")
             except Exception as e:
                 print(f"✗ Error: {e}")
                 all_results[dgp_name][encoder_name] = {
@@ -177,40 +208,45 @@ def evaluate_all_combinations(
     print("EVALUATION COMPLETE")
     print("=" * 80)
 
-    return all_results
+    return all_results, metric_timing_all
 
 
 def create_combined_heatmap(
     all_results: Dict[str, Dict[str, Dict[str, float]]],
+    metric_timing: Dict[str, List[Tuple[float, float]]],
     dgp_names: List[str],
     encoder_names: List[str],
     metric_names: Dict[str, str],
+    n_samples: int,
+    n_factors: int,
 ) -> plt.Figure:
     """
-    Create a combined figure with one heatmap per DGP.
+    Create a combined figure with one heatmap per DGP and a timing/memory table per metric.
     
-    Layout: One subplot per DGP, showing Encoders (rows) × Metrics (columns).
+    Layout: One subplot per DGP, showing Encoders (rows) × Metrics (columns),
+    plus a timing/memory summary table showing mean ± std per metric.
     """
     n_dgps = len(dgp_names)
     n_encoders = len(encoder_names)
     n_metrics = len(metric_names)
     
-    # Create figure with subplots arranged vertically
-    fig, axes = plt.subplots(
-        n_dgps, 1,
-        figsize=(10, 3 * n_dgps),
-        constrained_layout=False
-    )
+    # Create figure with GridSpec for flexible layout
+    # Add extra space at bottom for timing table
+    fig_height = 3.5 * n_dgps + 2.0  # Extra space for table
+    fig = plt.figure(figsize=(12, fig_height))
     
-    # Adjust layout to make room for the title
-    fig.subplots_adjust(top=0.94, bottom=0.05, left=0.15, right=0.92)
+    # Create GridSpec: main heatmaps + timing table at bottom
+    from matplotlib.gridspec import GridSpec
+    gs = GridSpec(n_dgps + 1, 2, figure=fig, height_ratios=[1]*n_dgps + [0.35],
+                  width_ratios=[20, 1], hspace=0.3, wspace=0.05)
     
-    # Ensure axes is always iterable
-    if n_dgps == 1:
-        axes = [axes]
+    # Store axes and images for colorbar
+    axes = []
+    im = None
     
     for idx, dgp_name in enumerate(dgp_names):
-        ax = axes[idx]
+        ax = fig.add_subplot(gs[idx, 0])
+        axes.append(ax)
         
         # Prepare data matrix: Encoders (rows) × Metrics (columns)
         data = np.zeros((n_encoders, n_metrics))
@@ -228,18 +264,22 @@ def create_combined_heatmap(
         # Set ticks and labels
         ax.set_xticks(np.arange(n_metrics))
         ax.set_yticks(np.arange(n_encoders))
-        ax.set_xticklabels(list(metric_names.values()), fontsize=10)
+        ax.set_xticklabels(list(metric_names.values()), fontsize=9, rotation=45, ha='right')
         
         # Get encoder display names
         encoder_labels = []
         for encoder_name in encoder_names:
             encoder_cls = ENCODER_CLASSES[encoder_name]
             encoder_instance = encoder_cls(d=4)
-            # Shorten the name for display
-            short_name = encoder_instance.name.split(':')[0] if ':' in encoder_instance.name else encoder_instance.name
-            encoder_labels.append(f"{encoder_name} ({short_name[:20]})")
+            # Prefer an explicit display_name if provided (e.g., baselines)
+            display = getattr(encoder_instance, "display_name", None)
+            if display:
+                short_name = display
+            else:
+                short_name = encoder_instance.name.split(':')[0] if ':' in encoder_instance.name else encoder_instance.name
+            encoder_labels.append(f"{encoder_name} ({short_name[:22]})")
         
-        ax.set_yticklabels(encoder_labels, fontsize=9)
+        ax.set_yticklabels(encoder_labels, fontsize=8)
         
         # Add text annotations
         for i in range(n_encoders):
@@ -250,21 +290,21 @@ def create_combined_heatmap(
                         j, i, f"{value:.0f}",
                         ha="center", va="center",
                         color="black" if 30 < value < 70 else "white",
-                        fontsize=11,
+                        fontsize=10,
                         fontweight="bold",
                     )
         
         # Get DGP display name
         dgp_cls = DGP_CLASSES[dgp_name]
-        dgp_instance = dgp_cls(d=5) # d=5 is arbitrary just for naming
+        dgp_instance = dgp_cls(d=5)
         dgp_title = dgp_instance.name
         
         # Add title for this subplot
         ax.set_title(
             f"DGP = {dgp_title}",
-            fontsize=12,
+            fontsize=11,
             fontweight="bold",
-            pad=10,
+            pad=8,
         )
         
         # Add grid
@@ -272,27 +312,77 @@ def create_combined_heatmap(
         ax.set_yticks(np.arange(n_encoders + 1) - 0.5, minor=True)
         ax.grid(which="minor", color="white", linestyle="-", linewidth=2)
         
-        # Only show x-axis label on bottom subplot
+        # Only show x-axis label on bottom heatmap
         if idx == n_dgps - 1:
-            ax.set_xlabel("Identifiability Metric", fontsize=11, fontweight="bold")
+            ax.set_xlabel("Identifiability Metric", fontsize=10, fontweight="bold")
         
         # Y-axis label for all subplots
-        ax.set_ylabel("Encoder", fontsize=11, fontweight="bold")
+        ax.set_ylabel("Encoder", fontsize=10, fontweight="bold")
     
-    # Add a single colorbar for all subplots
-    fig.colorbar(
-        im, ax=axes, 
-        label="Score (0-100)", 
-        orientation="vertical",
-        fraction=0.02,
-        pad=0.02
+    # Add colorbar on the right side (spanning all heatmaps)
+    cbar_ax = fig.add_subplot(gs[:n_dgps, 1])
+    cbar = fig.colorbar(im, cax=cbar_ax, orientation="vertical")
+    cbar.set_label("Score (0-100)", fontsize=10)
+    cbar.ax.tick_params(labelsize=9)
+    
+    # Create timing/memory table at the bottom (per metric)
+    table_ax = fig.add_subplot(gs[n_dgps, :])
+    table_ax.axis('off')
+    
+    # Compute mean ± std for time and memory per metric
+    metric_keys = list(metric_names.keys())
+    metric_display = list(metric_names.values())
+    
+    time_row = []
+    memory_row = []
+    
+    for metric_key in metric_keys:
+        timings = metric_timing.get(metric_key, [])
+        if timings:
+            times = [t for t, _ in timings]
+            memories = [m for _, m in timings]
+            time_mean, time_std = np.mean(times), np.std(times)
+            mem_mean, mem_std = np.mean(memories), np.std(memories)
+            time_row.append(f"{time_mean*1000:.0f}±{time_std*1000:.0f}ms")
+            memory_row.append(f"{mem_mean:.1f}±{mem_std:.1f}MB")
+        else:
+            time_row.append("N/A")
+            memory_row.append("N/A")
+    
+    # Create table data: 2 rows (Time, Memory) × n_metrics columns
+    table_data = [time_row, memory_row]
+    row_labels = ["Time", "Memory"]
+    
+    # Create the table
+    table = table_ax.table(
+        cellText=table_data,
+        rowLabels=row_labels,
+        colLabels=metric_display,
+        loc='center',
+        cellLoc='center',
     )
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+    table.scale(1.0, 1.3)
     
-    # Overall title
+    # Style the table
+    for (row, col), cell in table.get_celld().items():
+        if row == 0:  # Header row
+            cell.set_text_props(fontweight='bold', fontsize=8)
+            cell.set_facecolor('#E6E6E6')
+        elif col == -1:  # Row labels
+            cell.set_text_props(fontweight='bold', fontsize=9)
+            cell.set_facecolor('#E6E6E6')
+    
+    table_ax.set_title("Metric Timing & Memory (mean ± std)", fontsize=10, fontweight="bold", pad=5)
+    
+    # Overall title with samples/factors info
     fig.suptitle(
-        "Identifiability Metrics: DGP × Encoder Combinations",
-        fontsize=14,
-        fontweight="bold"
+        f"Identifiability Metrics: DGP × Encoder Combinations\n"
+        f"(samples={n_samples}, factors={n_factors})",
+        fontsize=13,
+        fontweight="bold",
+        y=0.98
     )
     
     return fig
@@ -332,7 +422,7 @@ def main():
     args = parser.parse_args()
 
     # Evaluate all combinations
-    all_results = evaluate_all_combinations(
+    all_results, metric_timing = evaluate_all_combinations(
         n_samples=args.samples,
         n_factors=args.factors,
         seed=args.seed,
@@ -347,9 +437,12 @@ def main():
     
     fig = create_combined_heatmap(
         all_results=all_results,
+        metric_timing=metric_timing,
         dgp_names=dgp_names,
         encoder_names=encoder_names,
         metric_names=METRIC_NAMES,
+        n_samples=args.samples,
+        n_factors=args.factors,
     )
     
     # Save figure

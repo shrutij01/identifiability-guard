@@ -137,7 +137,7 @@ class TestD4MultiRedundant:
     
     def test_redundancy(self):
         """Test that Z[:, 2] = g(Z[:, 0], Z[:, 1])."""
-        dgp = D4MultiRedundant(d=4, redundant_fns=lambda x, y: x * y, seed=42)
+        dgp = D4MultiRedundant(d=4, r=1, redundant_fns=lambda x, y: x * y, seed=42)
         Z = dgp.sample(100)
         
         # Z[:, 2] should equal Z[:, 0] * Z[:, 1]
@@ -145,7 +145,7 @@ class TestD4MultiRedundant:
     
     def test_custom_redundancy_function(self):
         """Test with custom redundancy function."""
-        dgp = D4MultiRedundant(d=3, redundant_fns=lambda x, y: x + y, seed=42)
+        dgp = D4MultiRedundant(d=3, r=1, redundant_fns=lambda x, y: x + y, seed=42)
         Z = dgp.sample(100)
         
         np.testing.assert_array_almost_equal(Z[:, 2], Z[:, 0] + Z[:, 1])
@@ -154,3 +154,12 @@ class TestD4MultiRedundant:
         """Test that d < 3 raises error."""
         with pytest.raises(ValueError):
             D4MultiRedundant(d=2)
+
+    def test_noise_in_redundancy(self):
+        """Test redundancy with noise."""
+        dgp = D4MultiRedundant(d=4, r=1, noise_std=0.1, seed=42)
+        Z = dgp.sample(1000)
+        
+        # Correlation should be high but not perfect (default fn is product)
+        corr = np.corrcoef(Z[:, 0] * Z[:, 1], Z[:, 2])[0, 1]
+        assert 0.9 < corr < 1.0

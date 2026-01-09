@@ -446,6 +446,8 @@ def mean_corr_coef_np(x, y, method="pearson"):
                 cc[i, j] = rdc(x[:, i], y[:, j])
     else:
         raise ValueError("not a valid method: {}".format(method))
+    # Replace NaN/Inf (can happen when a column is constant) to keep metric usable
+    cc = np.nan_to_num(cc, nan=0.0, posinf=0.0, neginf=0.0)
     cc = np.abs(cc)
     # import ipdb
 
@@ -549,7 +551,9 @@ class MCCMetric(BaseMetric):
     def _compute_impl(self, Z: np.ndarray, Z_hat: np.ndarray) -> MetricResult:
         """Compute MCC from samples (supports both NumPy and PyTorch)."""
         mcc_score = float(mean_corr_coef(Z, Z_hat, method=self.method))
-        # Clip to [0, 1] to handle floating-point precision issues
+        # Replace non-finite scores and clip to [0, 1]
+        if not np.isfinite(mcc_score):
+            mcc_score = 0.0
         mcc_score = float(np.clip(mcc_score, 0.0, 1.0))
 
         return self.make_result(

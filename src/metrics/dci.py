@@ -227,13 +227,21 @@ class DCIMetric(BaseMetric):
         disent = float(disentanglement(importance_matrix))
         complet = float(completeness(importance_matrix))
 
+        # Clamp informativeness to [0, 1] to avoid failures when regressors return negative R²
+        train_info = float(np.clip(train_acc, 0.0, 1.0))
+        test_info = float(np.clip(test_acc, 0.0, 1.0))
+
         return self.make_result(
             primary_score=disent,
             subscores={
                 "disentanglement": disent,
                 "completeness": complet,
-                "informativeness_train": float(train_acc),
-                "informativeness_test": float(test_acc),
+                "informativeness_train": train_info,
+                "informativeness_test": test_info,
+            },
+            metadata={
+                "train_informativeness_raw": float(train_acc),
+                "test_informativeness_raw": float(test_acc),
             },
         )
 
