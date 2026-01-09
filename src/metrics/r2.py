@@ -47,7 +47,12 @@ class R2Metric(BaseMetric):
                 r2_i = 1.0 - mse / var
             r2_scores.append(r2_i)
 
-        return float(np.mean(r2_scores)) if r2_scores else 0.0
+        if not r2_scores:
+            return 0.0
+
+        # Replace any non-finite values before averaging to keep metric stable
+        r2_array = np.nan_to_num(np.array(r2_scores, dtype=float), nan=0.0, posinf=0.0, neginf=0.0)
+        return float(np.mean(r2_array))
 
     @staticmethod
     def _least_squares(X: np.ndarray, y: np.ndarray) -> np.ndarray:
