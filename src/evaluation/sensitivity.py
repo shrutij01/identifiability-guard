@@ -130,6 +130,7 @@ def sensitivity_analysis_1d(
     
     # Initialize results storage
     metric_results: Dict[str, List[List[float]]] = {}
+    all_metric_names: set = set()  # Track all metric names seen
     
     if verbose:
         print(f"Running 1D sensitivity analysis for parameter '{param_name}'")
@@ -156,22 +157,44 @@ def sensitivity_analysis_1d(
                 
                 # Store results
                 for metric_name, value in metrics.items():
+                    all_metric_names.add(metric_name)
                     if metric_name not in seed_results:
-                        seed_results[metric_name] = []
+                        # Initialize with NaN for any prior seeds
+                        seed_results[metric_name] = [np.nan] * seed_idx
                     seed_results[metric_name].append(value)
+                
+                # For any metric we've seen before but not in this run, add NaN
+                for metric_name in all_metric_names:
+                    if metric_name not in seed_results:
+                        seed_results[metric_name] = [np.nan] * seed_idx
+                    elif len(seed_results[metric_name]) < seed_idx + 1:
+                        seed_results[metric_name].append(np.nan)
             
             except Exception as e:
                 if verbose:
                     print(f"  Warning: Evaluation failed for seed {seed}: {e}")
-                # Add NaN for failed runs
-                for metric_name in seed_results.keys():
+                # Add NaN for failed runs for all known metrics
+                for metric_name in all_metric_names:
+                    if metric_name not in seed_results:
+                        seed_results[metric_name] = [np.nan] * seed_idx
                     seed_results[metric_name].append(np.nan)
+        
+        # Ensure all seed_results have n_seeds values
+        for metric_name in list(seed_results.keys()):
+            while len(seed_results[metric_name]) < n_seeds:
+                seed_results[metric_name].append(np.nan)
         
         # Add to overall results
         for metric_name, values in seed_results.items():
             if metric_name not in metric_results:
-                metric_results[metric_name] = []
+                # Back-fill with NaN lists for prior param values
+                metric_results[metric_name] = [[np.nan] * n_seeds for _ in range(i)]
             metric_results[metric_name].append(values)
+    
+    # Ensure all metrics have entries for all param values (back-fill any missing)
+    for metric_name in metric_results:
+        while len(metric_results[metric_name]) < len(param_values):
+            metric_results[metric_name].append([np.nan] * n_seeds)
     
     return param_values, metric_results
 
