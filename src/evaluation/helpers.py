@@ -62,6 +62,11 @@ ALL_METRICS = {
     'mcc_spearman': 'MCC with Spearman correlation',
     'mcc_rdc': 'MCC with Randomized Dependence Coefficient',
     'r2': 'R² coefficient of determination',
+    'mig': 'Mutual Information Gap',
+    'tmex': 'Testing for Measurement Exchangeability',
+    'infom': 'InfoM (Modularity)',
+    'infoe': 'InfoE (Explicitness)',
+    'infoc': 'InfoC (Compactness)',
 }
 
 # Metric display names for visualization
@@ -73,6 +78,11 @@ METRIC_DISPLAY_NAMES = {
     'mcc_spearman': 'MCC-S',
     'mcc_rdc': 'MCC-RDC',
     'r2': 'R²',
+    'mig': 'MIG',
+    'tmex': 'T-MEX',
+    'infom': 'InfoM',
+    'infoe': 'InfoE',
+    'infoc': 'InfoC',
 }
 
 # Default subset of metrics to track (for faster evaluation)
@@ -83,7 +93,12 @@ DEFAULT_METRICS = {
     'mcc_pearson',
     'mcc_spearman',
     'mcc_rdc',
-    'r2'
+    'r2',
+    'mig',
+    'tmex',
+    'infom',
+    'infoe',
+    'infoc',
 }
 
 
@@ -113,68 +128,84 @@ def extract_metric_scores(
         metrics_to_extract: Set of metric names to extract. If None, extracts all.
     
     Returns:
-        Dictionary of metric_name -> score.
+        Dictionary of metric_name -> score. Missing metrics will have np.nan.
     """
     if metrics_to_extract is None:
         metrics_to_extract = set(ALL_METRICS.keys())
     
     results = {}
     
+    # Initialize all requested metrics with NaN (will be overwritten if computed)
+    for metric_name in metrics_to_extract:
+        results[metric_name] = np.nan
+    
     # DCI subscores
     dci_metrics = {'dci_disentanglement', 'dci_completeness', 'dci_informativeness'}
     if 'dci' in all_results and dci_metrics & metrics_to_extract:
         dci_result = all_results['dci']
-        if 'dci_disentanglement' in metrics_to_extract:
+        if 'dci_disentanglement' in metrics_to_extract and dci_result is not None:
             results['dci_disentanglement'] = dci_result.subscores.get('disentanglement', np.nan)
-        if 'dci_completeness' in metrics_to_extract:
+        if 'dci_completeness' in metrics_to_extract and dci_result is not None:
             results['dci_completeness'] = dci_result.subscores.get('completeness', np.nan)
-        if 'dci_informativeness' in metrics_to_extract:
+        if 'dci_informativeness' in metrics_to_extract and dci_result is not None:
             results['dci_informativeness'] = dci_result.subscores.get('informativeness_test', np.nan)
     
     # MCC variants
     for mcc_type in ['mcc_pearson', 'mcc_spearman', 'mcc_rdc']:
-        if mcc_type in metrics_to_extract and mcc_type in all_results:
+        if mcc_type in metrics_to_extract and mcc_type in all_results and all_results[mcc_type] is not None:
             results[mcc_type] = all_results[mcc_type].primary_score
     
     # R²
-    if 'r2' in metrics_to_extract and 'r2' in all_results:
+    if 'r2' in metrics_to_extract and 'r2' in all_results and all_results['r2'] is not None:
         results['r2'] = all_results['r2'].primary_score
+    
+    # MIG
+    if 'mig' in metrics_to_extract and 'mig' in all_results and all_results['mig'] is not None:
+        results['mig'] = all_results['mig'].primary_score
+    
+    # T-MEX
+    if 'tmex' in metrics_to_extract and 'tmex' in all_results and all_results['tmex'] is not None:
+        results['tmex'] = all_results['tmex'].primary_score
+    
+    # InfoMEC metrics
+    if 'infom' in metrics_to_extract and 'infom' in all_results and all_results['infom'] is not None:
+        results['infom'] = all_results['infom'].primary_score
+    if 'infoe' in metrics_to_extract and 'infoe' in all_results and all_results['infoe'] is not None:
+        results['infoe'] = all_results['infoe'].primary_score
+    if 'infoc' in metrics_to_extract and 'infoc' in all_results and all_results['infoc'] is not None:
+        results['infoc'] = all_results['infoc'].primary_score
     
     return results
 
 
-def sanitize_array(arr: np.ndarray, name: str = "array") -> np.ndarray:
+def validate_array(arr: np.ndarray, name: str = "array") -> None:
     """
-    Sanitize array by clipping extreme values and handling NaN/Inf.
-    
-    This helps prevent numerical issues in metric computation (overflow, NaN propagation).
-    
+    Validate that an array is suitable for metric computation.
+
+    Raises ``ValueError`` if the array contains NaN, Inf, or extreme values
+    that would cause numerical problems.
+
     Args:
-        arr: Input array to sanitize.
-        name: Name of the array for warning messages.
-        
-    Returns:
-        Sanitized array with extreme values clipped and NaN/Inf replaced.
+        arr: Input array to validate.
+        name: Descriptive name for error messages.
+
+    Raises:
+        ValueError: If the array contains NaN, Inf, or values outside float64
+            representable range.
     """
-    # Check for NaN
-    nan_count = np.sum(np.isnan(arr))
+    nan_count = int(np.sum(np.isnan(arr)))
     if nan_count > 0:
-        warnings.warn(f"{name} contains {nan_count} NaN values, replacing with 0")
-        arr = np.nan_to_num(arr, nan=0.0)
-    
-    # Check for Inf
-    inf_count = np.sum(np.isinf(arr))
+        raise ValueError(
+            f"{name} contains {nan_count} NaN value(s). "
+            f"This indicates a problem in the data generation or encoding pipeline."
+        )
+
+    inf_count = int(np.sum(np.isinf(arr)))
     if inf_count > 0:
-        warnings.warn(f"{name} contains {inf_count} Inf values, clipping to finite range")
-        arr = np.nan_to_num(arr, posinf=1e10, neginf=-1e10)
-    
-    # Clip extreme values to prevent overflow in float32 operations
-    max_val = np.finfo(np.float32).max / 10  # Leave some headroom
-    if np.any(np.abs(arr) > max_val):
-        warnings.warn(f"{name} contains extreme values, clipping to ±{max_val:.2e}")
-        arr = np.clip(arr, -max_val, max_val)
-    
-    return arr
+        raise ValueError(
+            f"{name} contains {inf_count} Inf value(s). "
+            f"This indicates a numerical overflow in the data pipeline."
+        )
 
 
 def evaluate_combination(
@@ -228,10 +259,12 @@ def evaluate_combination(
     encoder = encoder_cls(d=n_factors, seed=seed, **encoder_kwargs)
     Z_hat = encoder.encode(Z)
     
-    # Sanitize inputs to prevent numerical issues
+    # Validate inputs — NaN/Inf in data is a pipeline bug, not something to
+    # paper over.  BaseMetric._validate_samples does this too, but checking
+    # early gives clearer error messages with the array name.
     if sanitize_inputs:
-        Z = sanitize_array(Z, "Z (ground-truth)")
-        Z_hat = sanitize_array(Z_hat, "Z_hat (encoded)")
+        validate_array(Z, "Z (ground-truth)")
+        validate_array(Z_hat, "Z_hat (encoded)")
     
     # Compute metrics
     if registry is None:

@@ -139,10 +139,19 @@ def main(dgp_choice=None, encoder_choice=None, compact=False):
         print("=" * 70)
 
         # Compute metrics
-        dci = registry.create("dci").compute(Z, Z_hat)
-        mcc_p = registry.create("mcc_pearson").compute(Z, Z_hat)
-        mcc_s = registry.create("mcc_spearman").compute(Z, Z_hat)
-        r2 = registry.create("r2").compute(Z, Z_hat)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            dci = registry.create("dci").compute(Z, Z_hat)
+            mcc_p = registry.create("mcc_pearson").compute(Z, Z_hat)
+            mcc_s = registry.create("mcc_spearman").compute(Z, Z_hat)
+            r2 = registry.create("r2").compute(Z, Z_hat)
+            mig = registry.create("mig").compute(Z, Z_hat)
+            tmex = registry.create("tmex").compute(Z, Z_hat)
+            infom = registry.create("infom").compute(Z, Z_hat)
+            infoe = registry.create("infoe").compute(Z, Z_hat)
+            infoc = registry.create("infoc").compute(Z, Z_hat)
 
         print()
         print("DCI (Disentanglement, Completeness, Informativeness)")
@@ -156,6 +165,17 @@ def main(dgp_choice=None, encoder_choice=None, compact=False):
         print()
         print("R² Score")
         print(f"  R² (optimal):         {r2.primary_score:.3f}")
+        print()
+        print("MIG (Mutual Information Gap)")
+        print(f"  MIG:                  {mig.primary_score:.3f}")
+        print()
+        print("T-MEX (Testing for Measurement Exchangeability)")
+        print(f"  T-MEX:                {tmex.primary_score:.3f}")
+        print()
+        print("InfoMEC (Information-theoretic Modularity, Explicitness, Compactness)")
+        print(f"  InfoM (Modularity):   {infom.primary_score:.3f}")
+        print(f"  InfoE (Explicitness): {infoe.primary_score:.3f}")
+        print(f"  InfoC (Compactness):  {infoc.primary_score:.3f}")
         print()
         print("=" * 70)
         return
