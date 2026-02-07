@@ -447,6 +447,8 @@ def mean_corr_coef_np(x, y, method="pearson"):
     else:
         raise ValueError("not a valid method: {}".format(method))
     # Replace NaN/Inf (can happen when a column is constant) to keep metric usable
+    nan_count = int(np.sum(np.isnan(cc)))
+    inf_count = int(np.sum(np.isinf(cc)))
     cc = np.nan_to_num(cc, nan=0.0, posinf=0.0, neginf=0.0)
     cc = np.abs(cc)
     # import ipdb
@@ -550,9 +552,14 @@ class MCCMetric(BaseMetric):
 
     def _compute_impl(self, Z: np.ndarray, Z_hat: np.ndarray) -> MetricResult:
         """Compute MCC from samples (supports both NumPy and PyTorch)."""
+        # Pre-check for constant columns (will produce NaN correlations)
+        z_constant = int(np.sum(np.std(Z, axis=0) == 0))
+        zhat_constant = int(np.sum(np.std(Z_hat, axis=0) == 0))
+
         mcc_score = float(mean_corr_coef(Z, Z_hat, method=self.method))
         # Replace non-finite scores and clip to [0, 1]
-        if not np.isfinite(mcc_score):
+        score_was_nonfinite = not np.isfinite(mcc_score)
+        if score_was_nonfinite:
             mcc_score = 0.0
         mcc_score = float(np.clip(mcc_score, 0.0, 1.0))
 
@@ -563,6 +570,11 @@ class MCCMetric(BaseMetric):
             },
             metadata={
                 "method": self.method,
+                "nan_info": {
+                    "z_constant_columns": z_constant,
+                    "zhat_constant_columns": zhat_constant,
+                    "score_was_nonfinite": score_was_nonfinite,
+                },
             },
         )
 
