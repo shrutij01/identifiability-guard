@@ -9,8 +9,8 @@ Usage:
     python examples/evaluate_all_combinations_combined.py [--samples N] [--factors D] [--seed S]
 
     Options:
-        --samples N    Number of samples to generate (default: 5000)
-        --factors D    Number of latent factors (default: 4)
+        --samples N    Number of samples to generate (default: 300)
+        --factors D    Number of latent factors (default: 5)
         --seed S       Random seed for reproducibility (default: 42)
         --output FILE  Output file path (default: results/combined_heatmap.png)
 
@@ -47,7 +47,7 @@ from src.evaluation import (
     extract_metric_scores,
     get_dgp_class,
     get_encoder_class,
-    sanitize_array,
+    validate_array,
 )
 
 
@@ -79,9 +79,9 @@ def evaluate_combination(
     encoder = encoder_cls(d=n_factors, seed=seed)
     Z_hat = encoder.encode(Z)
     
-    # Sanitize arrays to prevent NaN/Inf errors
-    Z = sanitize_array(Z)
-    Z_hat = sanitize_array(Z_hat)
+    # Validate arrays — NaN/Inf is a pipeline bug, not something to hide
+    validate_array(Z, "Z (ground-truth)")
+    validate_array(Z_hat, "Z_hat (encoded)")
 
     # Compute each metric individually to track timing per metric
     results = {}
@@ -139,12 +139,82 @@ def evaluate_combination(
     tracemalloc.stop()
     metric_timing['r2'] = (elapsed, peak / (1024 * 1024))
     
+    # MIG
+    tracemalloc.start()
+    start_time = time.perf_counter()
+    try:
+        mig_metric = registry.create('mig')
+        mig_result = mig_metric.compute(Z, Z_hat)
+        results['mig'] = mig_result.primary_score
+    except Exception:
+        results['mig'] = np.nan
+    elapsed = time.perf_counter() - start_time
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    metric_timing['mig'] = (elapsed, peak / (1024 * 1024))
+    
+    # T-MEX
+    tracemalloc.start()
+    start_time = time.perf_counter()
+    try:
+        tmex_metric = registry.create('tmex')
+        tmex_result = tmex_metric.compute(Z, Z_hat)
+        results['tmex'] = tmex_result.primary_score
+    except Exception:
+        results['tmex'] = np.nan
+    elapsed = time.perf_counter() - start_time
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    metric_timing['tmex'] = (elapsed, peak / (1024 * 1024))
+    
+    # InfoM
+    tracemalloc.start()
+    start_time = time.perf_counter()
+    try:
+        infom_metric = registry.create('infom')
+        infom_result = infom_metric.compute(Z, Z_hat)
+        results['infom'] = infom_result.primary_score
+    except Exception:
+        results['infom'] = np.nan
+    elapsed = time.perf_counter() - start_time
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    metric_timing['infom'] = (elapsed, peak / (1024 * 1024))
+    
+    # InfoE
+    tracemalloc.start()
+    start_time = time.perf_counter()
+    try:
+        infoe_metric = registry.create('infoe')
+        infoe_result = infoe_metric.compute(Z, Z_hat)
+        results['infoe'] = infoe_result.primary_score
+    except Exception:
+        results['infoe'] = np.nan
+    elapsed = time.perf_counter() - start_time
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    metric_timing['infoe'] = (elapsed, peak / (1024 * 1024))
+    
+    # InfoC
+    tracemalloc.start()
+    start_time = time.perf_counter()
+    try:
+        infoc_metric = registry.create('infoc')
+        infoc_result = infoc_metric.compute(Z, Z_hat)
+        results['infoc'] = infoc_result.primary_score
+    except Exception:
+        results['infoc'] = np.nan
+    elapsed = time.perf_counter() - start_time
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    metric_timing['infoc'] = (elapsed, peak / (1024 * 1024))
+    
     return results, metric_timing
 
 
 def evaluate_all_combinations(
-    n_samples: int = 5000,
-    n_factors: int = 4,
+    n_samples: int = 300,
+    n_factors: int = 5,
     seed: int = 42,
 ) -> Tuple[Dict[str, Dict[str, Dict[str, float]]], Dict[str, List[Tuple[float, float]]]]:
     """
@@ -164,7 +234,7 @@ def evaluate_all_combinations(
     print(f"  Seed:     {seed}")
     print(f"  DGPs:     {list(DGP_CLASSES.keys())}")
     print(f"  Encoders: {list(ENCODER_CLASSES.keys())}")
-    print(f"  Metrics:  DCI (3 subscores), MCC (Pearson, Spearman, RDC), R²")
+    print(f"  Metrics:  DCI (3 subscores), MCC (3 variants), R², MIG, T-MEX, InfoM, InfoE, InfoC")
     print("=" * 80)
 
     registry = MetricRegistry()
@@ -397,14 +467,14 @@ def main():
     parser.add_argument(
         "--samples",
         type=int,
-        default=5000,
+        default=300,
         help="Number of samples to generate (default: 5000)",
     )
     parser.add_argument(
         "--factors",
         type=int,
-        default=4,
-        help="Number of latent factors (default: 4)",
+        default=5,
+        help="Number of latent factors (default: 5)",
     )
     parser.add_argument(
         "--seed",
