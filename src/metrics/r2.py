@@ -20,16 +20,17 @@ class R2Metric(BaseMetric):
     """
 
     def _compute_impl(self, Z: np.ndarray, Z_hat: np.ndarray) -> MetricResult:
-        score = self._compute_r2(Z, Z_hat)
+        score, nan_info = self._compute_r2(Z, Z_hat)
         subscores: Dict[str, float] = {"r2": score}
-        metadata: Dict[str, Any] = {"metric": "explicitness_r2"}
+        metadata: Dict[str, Any] = {"metric": "explicitness_r2", "nan_info": nan_info}
         return self.make_result(
             primary_score=score, subscores=subscores, metadata=metadata
         )
 
-    def _compute_r2(self, Z: np.ndarray, Z_hat: np.ndarray) -> float:
+    def _compute_r2(self, Z: np.ndarray, Z_hat: np.ndarray) -> tuple:
         n, d = Z.shape
         r2_scores = []
+        zero_var_count = 0
 
         for i in range(d):
             y = Z[:, i]
@@ -43,16 +44,23 @@ class R2Metric(BaseMetric):
             # If variance is zero, treat as perfectly explained to avoid div by zero.
             if var == 0.0:
                 r2_i = 1.0
+                zero_var_count += 1
             else:
                 r2_i = 1.0 - mse / var
             r2_scores.append(r2_i)
 
         if not r2_scores:
-            return 0.0
+            return 0.0, {'zero_variance_factors': 0, 'nonfinite_r2_count': 0}
 
         # Replace any non-finite values before averaging to keep metric stable
-        r2_array = np.nan_to_num(np.array(r2_scores, dtype=float), nan=0.0, posinf=0.0, neginf=0.0)
-        return float(np.mean(r2_array))
+        r2_array = np.array(r2_scores, dtype=float)
+        nonfinite_count = int(np.sum(~np.isfinite(r2_array)))
+        r2_array = np.nan_to_num(r2_array, nan=0.0, posinf=0.0, neginf=0.0)
+        nan_info = {
+            'zero_variance_factors': zero_var_count,
+            'nonfinite_r2_count': nonfinite_count,
+        }
+        return float(np.mean(r2_array)), nan_info
 
     @staticmethod
     def _least_squares(X: np.ndarray, y: np.ndarray) -> np.ndarray:

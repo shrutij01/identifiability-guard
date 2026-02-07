@@ -172,10 +172,18 @@ class MetricRegistry:
         - mcc_spearman: Mean Correlation Coefficient (Spearman)
         - mcc_rdc: Mean Correlation Coefficient (RDC)
         - r2: R² score
+        - mig: Mutual Information Gap
+        - tmex: Testing for Measurement Exchangeability
+        - infom: Information-theoretic Modularity
+        - infoe: Information-theoretic Explicitness
+        - infoc: Information-theoretic Compactness
         """
         from .dci import DCIMetric
         from .mcc import MCCMetric
         from .r2 import R2Metric
+        from .mig import MIGMetric
+        from .tmex import TMEXMetric
+        from .infomec import InfoMMetric, InfoEMetric, InfoCMetric
 
         self.register("dci", DCIMetric, default_kwargs={"train_test_split": 0.8})
         self.register(
@@ -186,6 +194,14 @@ class MetricRegistry:
         )
         self.register("mcc_rdc", MCCMetric, default_kwargs={"method": "rdc"})
         self.register("r2", R2Metric)
+        self.register("mig", MIGMetric, default_kwargs={"num_bins": 20})
+        self.register(
+            "tmex", TMEXMetric, 
+            default_kwargs={"alpha": 0.05, "regression_method": "lm", "rep": 9}
+        )
+        self.register("infom", InfoMMetric, default_kwargs={"discrete_latents": False})
+        self.register("infoe", InfoEMetric, default_kwargs={"discrete_latents": False})
+        self.register("infoc", InfoCMetric, default_kwargs={"discrete_latents": False})
 
     def __repr__(self) -> str:
         """String representation showing registered metrics."""
