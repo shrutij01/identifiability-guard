@@ -6,7 +6,7 @@ combinations for each DGP, similar to the provided example image format.
 Includes timing/memory profiling information.
 
 Usage:
-    python examples/evaluate_all_combinations_combined.py [--samples N] [--factors D] [--seed S]
+    python examples/big_table.py [--samples N] [--factors D] [--seed S]
 
     Options:
         --samples N    Number of samples to generate (default: 300)
@@ -15,9 +15,9 @@ Usage:
         --output FILE  Output file path (default: results/combined_heatmap.png)
 
     Examples:
-        python examples/evaluate_all_combinations_combined.py
-        python examples/evaluate_all_combinations_combined.py --samples 10000
-        python examples/evaluate_all_combinations_combined.py --output my_figure.png
+        python examples/big_table.py
+        python examples/big_table.py --samples 10000
+        python examples/big_table.py --output my_figure.png
 
 Output:
     - Creates a single figure with one heatmap per DGP

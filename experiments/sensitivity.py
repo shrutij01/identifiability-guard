@@ -11,9 +11,9 @@ Features:
 - Camera-ready sensitivity plots with error bands
 
 Usage:
-    python examples/evaluate_sensitivity.py --sweep-samples 1000,5000,10000
-    python examples/evaluate_sensitivity.py --sweep-correlation 0.0,0.3,0.5,0.7,0.9
-    python examples/evaluate_sensitivity.py --sweep-factors 3,5,7,10 --n-seeds 10
+    python examples/sensitivity.py --sweep-samples 1000,5000,10000
+    python examples/sensitivity.py --sweep-correlation 0.0,0.3,0.5,0.7,0.9
+    python examples/sensitivity.py --sweep-factors 3,5,7,10 --n-seeds 10
 """
 
 import sys
@@ -46,7 +46,7 @@ from src.evaluation import (
 
 
 # Default configuration
-DEFAULT_N_SAMPLES = 5000
+DEFAULT_N_SAMPLES = 1000
 DEFAULT_N_FACTORS = 5
 DEFAULT_N_SEEDS = 5
 DEFAULT_BASE_SEED = 42
@@ -178,8 +178,17 @@ def sweep_factors(
     base_seed: int,
     output_dir: Path,
     metrics_to_compute: Optional[Set[str]] = None,
+    n_factors_ground_truth: Optional[int] = None,
 ):
-    """Run sensitivity analysis sweeping over number of factors."""
+    """Run sensitivity analysis sweeping over number of factors.
+
+    Parameters
+    ----------
+    n_factors_ground_truth : int, optional
+        The ground-truth number of factors used in the experiment.  When
+        provided it is shown in the plot title so the reader knows which
+        ``d`` value the experiment was designed around.
+    """
     print("\n" + "=" * 80)
     print(f"SENSITIVITY ANALYSIS: Varying Number of Factors")
     print(f"DGP: {dgp}, Encoder: {encoder}")
@@ -212,10 +221,11 @@ def sweep_factors(
     )
     
     # Create plot
+    gt_str = f", d={n_factors_ground_truth}" if n_factors_ground_truth is not None else ""
     plot_sensitivity(
         stats,
         param_name="Number of Factors",
-        title=f"Sensitivity to Factor Dimensionality\n{dgp} + {encoder}",
+        title=f"Sensitivity to Factor Dimensionality\n{dgp} + {encoder}{gt_str}",
         output_path=output_dir / f"sweep_factors_{dgp}_{encoder}.png"
     )
     
@@ -332,6 +342,75 @@ def sweep_nonlinearity(
     return stats
 
 
+def sweep_encoder_nonlinearity(
+    dgp: str,
+    nonlinearity_values: List[float],
+    n_samples: int,
+    n_factors: int,
+    n_seeds: int,
+    base_seed: int,
+    output_dir: Path,
+    metrics_to_compute: Optional[Set[str]] = None,
+    nonlinearity_type: str = "tanh_modified",
+):
+    """Run sensitivity analysis sweeping over encoder E2 nonlinearity strength.
+
+    This is similar to ``sweep_nonlinearity`` but explicitly documented as
+    sweeping the **encoder** nonlinearity, keeping the DGP fixed.
+
+    Parameters
+    ----------
+    dgp : str
+        DGP to pair with E2 (e.g. ``'D1'``).
+    nonlinearity_values : list of float
+        Strength values in [0, 1] (0 = linear, 1 = fully nonlinear).
+    nonlinearity_type : str
+        Label used in filenames / titles (default ``'tanh_modified'``).
+    """
+    encoder = 'E2'
+    print("\n" + "=" * 80)
+    print(f"SENSITIVITY ANALYSIS: Varying Encoder Nonlinearity Strength")
+    print(f"DGP: {dgp}, Encoder: {encoder}, type: {nonlinearity_type}")
+    print("=" * 80)
+
+    def eval_fn(params):
+        params['dgp'] = dgp
+        params['encoder'] = encoder
+        params['n_samples'] = n_samples
+        params['n_factors'] = n_factors
+        return evaluate_dgp_encoder_combination(params, metrics_to_compute)
+
+    param_values, metric_results = sensitivity_analysis_1d(
+        eval_fn,
+        param_name='nonlinearity_strength',
+        param_values=nonlinearity_values,
+        fixed_params={},
+        n_seeds=n_seeds,
+        base_seed=base_seed,
+        verbose=True,
+    )
+
+    # Compute statistics
+    stats = compute_sensitivity_statistics(param_values, metric_results)
+
+    # Save results
+    output_file = output_dir / f"sweep_encoder_nl_{dgp}_{nonlinearity_type}.json"
+    save_sensitivity_results(
+        [{'param_values': param_values, 'metric_results': metric_results, 'statistics': stats}],
+        str(output_file)
+    )
+
+    # Create plot
+    plot_sensitivity(
+        stats,
+        param_name="Encoder Nonlinearity Strength",
+        title=f"Sensitivity to Encoder Nonlinearity ({nonlinearity_type})\n{dgp} + {encoder}",
+        output_path=output_dir / f"sweep_encoder_nl_{dgp}_{nonlinearity_type}.png"
+    )
+
+    return stats
+
+
 def plot_sensitivity(
     stats: Dict[str, Dict[str, List[float]]],
     param_name: str,
@@ -398,7 +477,7 @@ def plot_sensitivity(
         ax.set_ylabel('Score', fontsize=12)
         ax.set_title(display_name, fontsize=13)
         ax.grid(True, alpha=0.3)
-        ax.set_ylim([0, 1.05])
+        ax.set_ylim([-0.05, 1.05])
     
     plt.suptitle(title, fontsize=14, fontweight='bold')
     plt.tight_layout()
@@ -438,6 +517,11 @@ def main():
         '--sweep-nonlinearity',
         type=str,
         help='Comma-separated list of nonlinearity strengths for E2 (e.g., "0.0,0.25,0.5,0.75,1.0")',
+    )
+    parser.add_argument(
+        '--sweep-encoder-nonlinearity',
+        type=str,
+        help='Comma-separated list of encoder nonlinearity strengths for E2 (e.g., "0.0,0.25,0.5,0.75,1.0")',
     )
     
     # DGP and encoder selection
@@ -588,8 +672,22 @@ def main():
             metrics_to_compute,
         )
     
+    if args.sweep_encoder_nonlinearity:
+        nl_values = [float(x) for x in args.sweep_encoder_nonlinearity.split(',')]
+        sweep_encoder_nonlinearity(
+            args.dgp,
+            nl_values,
+            args.n_samples,
+            args.n_factors,
+            args.n_seeds,
+            args.base_seed,
+            output_dir,
+            metrics_to_compute,
+        )
+    
     # If no sweeps specified, show help
-    if not any([args.sweep_samples, args.sweep_factors, args.sweep_correlation, args.sweep_nonlinearity]):
+    if not any([args.sweep_samples, args.sweep_factors, args.sweep_correlation,
+                args.sweep_nonlinearity, args.sweep_encoder_nonlinearity]):
         parser.print_help()
         print("\nNo sweep specified. Use --sweep-* flags to run sensitivity analysis.")
     else:
