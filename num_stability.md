@@ -79,6 +79,10 @@ summarises every such guard.
 | **DCI** | `log(0)` in `scipy.stats.entropy` | Add `1e-11` epsilon to importance matrix | Negligible | — |
 | **DCI** | Importance matrix sums to 0 (no signal) | Replace with `np.ones_like` for weighting | Uniform weighting (neutral) | — |
 | **DCI** | Informativeness (R² from GBT) can be negative | `np.clip(…, 0.0, 1.0)` | Upward (negative clipped to 0) | Raw value stored in `metadata.test_informativeness_raw` |
+| **DCI** | Only 1 factor (`num_factors == 1`) → `entropy(base=1)` undefined | `disentanglement_per_code` returns `np.ones(num_codes)` | Mathematically correct (trivially disentangled) | — |
+| **DCI** | Only 1 code (`num_codes == 1`) → `entropy(base=1)` undefined in completeness | `completeness_per_factor` returns `np.ones(num_factors)` | Mathematically correct (trivially complete) | — |
+| **DCI** | Disentanglement/completeness score has float rounding to ≈ −1e-16 | `np.clip(…, 0.0, 1.0)` | Negligible | — |
+| **MIG** | Only 1 code dimension → `sorted_m[1, :]` index out of bounds | Return gap = 0 with warning | Mathematically correct (no second code to compare) | — |
 | **T-MEX** | PCM test statistic is NaN (variance of L = 0) | `stat = -np.inf` → `pval = 1.0` (no rejection) | Conservative (cannot reject null) | — |
 
 ---
@@ -182,3 +186,75 @@ computed".
 | Constant or near-constant code in Z_hat | MCC, InfoM/C | NaN correlation; zero NMI column |
 | Overcomplete disjoint encoder (E8) | InfoM | Many inactive latents → zero‑sum NMI columns |
 | Highly entangled encoder | InfoE | Logistic regression may fail to converge |
+| Undercomplete encoder with m=1 code dimension | MIG, DCI | MIG: `sorted_m[1,…]` out of bounds (only 1 row). DCI: `entropy(base=1)` undefined. Both now guarded. |
+| Uniform negative correlation with d>2 factors | D2 DGP | Uniform ρ matrix is PSD only if ρ > −1/(d−1). Experiments 3 & 4 use d=2 to allow full (−1,1) range. |
+| CI computation with zero standard error | multi_seed | `scipy.stats.t.interval(scale=0)` produces `inf * 0 = NaN`. Guarded by checking `sem > 0`. |
+
+---
+
+## 7  Detailed diff vs. original implementations (T‑MEX, MIG, InfoMEC)
+
+This section lists **every** numerical‑stability guard that was added
+compared to the original reference code, for T‑MEX, MIG, and InfoMEC.
+
+**Originals used as reference:**
+
+| Metric | Original file |
+|--------|---------------|
+| T‑MEX | `context_pycomets-main/pycomets/pcm.py` + `context_a-measurement-perspective-of-crl-main/small_example.py` |
+| MIG | `context_disentanglement_lib-master/disentanglement_lib/evaluation/metrics/mig.py` (+ `utils.py`) |
+| InfoMEC | `context_latent_quantization-main/disentangle/metrics/infomec.py` |
+
+### 7.1  T‑MEX
+
+| # | Guard | Location (new code) | Original behaviour | What was added |
+|---|-------|---------------------|--------------------|----------------|
+| 1 | `np.isnan(stat) → stat = -np.inf` | `src/metrics/tmex.py:237–238` | **Already present** in `pycomets/pcm.py:283` (`-np.Inf`) | Nothing — only cosmetic alias change (`np.Inf` → `np.inf`). |
+| 2 | Input NaN/Inf rejection | `src/metrics/base.py:196–199` (inherited via `BaseMetric._validate_samples`) | No check in `comp_tmex` or `PCM.test` | `np.all(np.isfinite(Z))` and `np.all(np.isfinite(Z_hat))` — raises `ValueError`. |
+| 3 | Output NaN rejection | `src/metrics/base.py:50–52` (inherited via `MetricResult.__post_init__`) | No check — returns raw int error count | `NaN <= x` is `False` in IEEE 754 → a NaN score raises `ValueError`. |
+| 4 | Minimum sample count | `src/metrics/tmex.py` — `required_min_samples = 50` | No check | Raises `ValueError` if `n < 50`. |
+
+> **Summary:** Zero new guards inside the PCM algorithm itself. All new
+> protections come from the `BaseMetric` framework wrapping (input
+> finiteness, output range, minimum samples).
+
+### 7.2  MIG
+
+| # | Guard | Location (new code) | Original behaviour | What was added |
+|---|-------|---------------------|--------------------|----------------|
+| 1 | Zero‑entropy factors excluded from mean | `src/metrics/mig.py:93` — `valid_mask = entropy > 0.0` | `np.divide(sorted_m[0, :] - sorted_m[1, :], entropy[:])` — NaN propagates into the mean | Mask out factors where `entropy == 0`; divide only over `valid_mask` elements (line 106). |
+| 2 | Warning on excluded factors | `src/metrics/mig.py:96–100` | Silent NaN | `warnings.warn(f"MIG: {num_zero_entropy} factor(s) have zero entropy …")` |
+| 3 | All factors constant → return 0.0 | `src/metrics/mig.py:102–104` | NaN score | `return 0.0, {'zero_entropy_factors': num_zero_entropy}` |
+| 4 | Single code dimension → gap is 0 | `src/metrics/mig.py:107–111` | `sorted_m[1, …]` → `IndexError` | Guard `sorted_m.shape[0] < 2`; return 0.0 with warning. |
+| 5 | `nan_info` tracking | `src/metrics/mig.py:113` (return value) | Not tracked | Returns `{'zero_entropy_factors': int}` alongside score. |
+| 6 | Score clipped to [0, 1] | `src/metrics/mig.py:185` — `np.clip(mig_score, 0.0, 1.0)` | Unbounded (can be > 1 or < 0 with noisy discretization) | Ensures `MetricResult` range constraint is satisfied. |
+| 6 | `num_bins < 2` validation | `src/metrics/mig.py:161–162` | No check (uses gin config) | `raise ValueError(f"num_bins must be >= 2, got {num_bins}")` |
+| 7 | Minimum sample count | `src/metrics/mig.py:167–168` — `max(30, self.num_bins * 2)` | No check | Raises `ValueError` if `n < max(30, 2 * num_bins)`. |
+| 8 | `compute_from_matrix`: zero‑MI guard | `src/metrics/mig.py:217–222` | Path does not exist in original | `if max_mi > 1e-10: … else: mig_per_factor[j] = 0.0` — prevents `0/0`. |
+| 9 | Input NaN/Inf rejection | `src/metrics/base.py:196–199` (inherited) | No check | `np.all(np.isfinite(…))` — raises `ValueError`. |
+| 10 | Output NaN rejection | `src/metrics/base.py:50–52` (inherited) | No check | NaN score → `ValueError`. |
+
+### 7.3  InfoMEC
+
+| # | Guard | Location (new code) | Original behaviour | What was added |
+|---|-------|---------------------|--------------------|----------------|
+| 1 | NMI normalisation: zero source entropy → `0.0` | `src/metrics/infomec.py:131` — `mi_ij / entropy_i if entropy_i > 0 else 0.0` | `ret[i, :] /= entropy` — unconditional, `0/0 = NaN` | Conditional division; zero entropy yields `nmi[i,j] = 0.0`. |
+| 2 | `_process_sources`: histogram‑bins continuous columns | `src/metrics/infomec.py:39–46` | `LabelEncoder` always (creates as many classes as unique values for continuous data → degenerate entropy) | Detects continuous columns (`len(unique_vals) > num_bins`) and uses `np.histogram` + `np.digitize` instead. |
+| 3 | No active latents → InfoM = InfoC = 0.0 | `src/metrics/infomec.py:296–308` | No guard; indexes into empty `pruned_nmi` → crash or NaN | Returns `{'infom': 0.0, 'infoc': 0.0, …, 'edge_case': 'no_active_latents'}`. |
+| 4 | InfoM: zero column‑sum latents excluded | `src/metrics/infomec.py:315–317` — `valid_cols = col_sums > 0` | `np.max(…, axis=0) / np.sum(…, axis=0)` — `0/0 = NaN` propagates into mean | Exclude zero‑sum columns; compute ratio only over `valid_cols`; track count in `infom_zero_sum_latents`. |
+| 5 | InfoM: `num_sources == 1` guard | `src/metrics/infomec.py:321–324` | `(… - 1/num_sources) / (1 - 1/num_sources)` — `0/0` when `num_sources == 1` | Uses `np.mean(modularity_ratios)` directly when `num_sources == 1`. |
+| 6 | InfoM: clip to [0, 1] | `src/metrics/infomec.py:327` — `np.clip(infom, 0.0, 1.0)` | Unbounded | Ensures valid score range. |
+| 7 | InfoM/C: `np.errstate(divide='ignore', invalid='ignore')` | `src/metrics/infomec.py:314, 330` | No error‑state management | Suppresses NumPy runtime warnings from guarded divisions. |
+| 8 | InfoC: zero row‑sum factors excluded | `src/metrics/infomec.py:331–333` — `valid_rows = row_sums > 0` | `np.max(…, axis=1) / np.sum(…, axis=1)` — `0/0 = NaN` propagates into mean | Exclude zero‑sum rows; compute ratio only over `valid_rows`; track count in `infoc_zero_sum_factors`. |
+| 9 | InfoC: `num_active_latents == 1` guard | `src/metrics/infomec.py:337–340` | `(… - 1/num_active_latents) / (1 - 1/num_active_latents)` — `0/0` when 1 | Uses `np.mean(compactness_ratios)` directly when `num_active_latents == 1`. |
+| 10 | InfoC: clip to [0, 1] | `src/metrics/infomec.py:343` — `np.clip(infoc, 0.0, 1.0)` | Unbounded | Ensures valid score range. |
+| 11 | InfoE: logistic regression wrapped in try/except | `src/metrics/infomec.py:161–170` | `model.fit(X, y)` — exception propagates | `except Exception: return np.nan` — caller excludes that factor from average. |
+| 12 | InfoE: suppress convergence warnings | `src/metrics/infomec.py:162–164` | No warning management | `warnings.filterwarnings('ignore', message='.*lbfgs failed to converge.*')` |
+| 13 | InfoE: NaN entropy check before division | `src/metrics/infomec.py:224–227` | NaN propagates into NPI | `if np.isnan(h_si_given_z) or np.isnan(h_si): … continue` — factor skipped. |
+| 14 | InfoE: `h_si > 0` before dividing | `src/metrics/infomec.py:230–234` | `(h_si - h_si_given_z) / h_si` — `0/0 = NaN` if marginal entropy is 0 | `if h_si > 0: … else: npi = 0.0`. |
+| 15 | InfoE: NPI clipped to [0, 1] | `src/metrics/infomec.py:232` — `max(0.0, min(1.0, npi))` | Unbounded (can be negative or > 1) | Clips each per‑factor NPI value. |
+| 16 | InfoE: NaN‑filtered averaging + fallback to 0.0 | `src/metrics/infomec.py:244–246` | `np.mean(…)` — NaN contaminates mean | `valid = npi_array[~np.isnan(npi_array)]`; `float(np.mean(valid)) if len(valid) > 0 else 0.0`. |
+| 17 | InfoE: warning when factors excluded | `src/metrics/infomec.py:238–242` | Silent | `warnings.warn(f"InfoE: logistic regression failed for {nan_entropy_count} factor(s); …")` |
+| 18 | InfoE: `nan_info` tracking | `src/metrics/infomec.py:248–252` (return value) | Not tracked | Returns `{'logistic_regression_failures': int, 'factors_used': int, 'factors_total': int}`. |
+| 19 | Input NaN/Inf rejection | `src/metrics/base.py:196–199` (inherited) | No check | `np.all(np.isfinite(…))` — raises `ValueError`. |
+| 20 | Output NaN rejection | `src/metrics/base.py:50–52` (inherited) | No check | NaN score → `ValueError`. |

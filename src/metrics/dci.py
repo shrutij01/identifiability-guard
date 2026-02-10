@@ -107,6 +107,9 @@ def compute_importance_gbt(
 def disentanglement_per_code(importance_matrix):
     """Compute disentanglement score of each code."""
     # importance_matrix is of shape [num_codes, num_factors].
+    if importance_matrix.shape[1] <= 1:
+        # Only 1 factor → entropy is 0; disentanglement is trivially 1.
+        return np.ones(importance_matrix.shape[0])
     return 1.0 - scipy.stats.entropy(
         importance_matrix.T + 1e-11, base=importance_matrix.shape[1]
     )
@@ -125,6 +128,9 @@ def disentanglement(importance_matrix):
 def completeness_per_factor(importance_matrix):
     """Compute completeness of each factor."""
     # importance_matrix is of shape [num_codes, num_factors].
+    if importance_matrix.shape[0] <= 1:
+        # Only 1 code → entropy is 0; completeness is trivially 1.
+        return np.ones(importance_matrix.shape[1])
     return 1.0 - scipy.stats.entropy(
         importance_matrix + 1e-11, base=importance_matrix.shape[0]
     )
@@ -224,8 +230,8 @@ class DCIMetric(BaseMetric):
             discrete_factors=self.discrete_factors,
         )
 
-        disent = float(disentanglement(importance_matrix))
-        complet = float(completeness(importance_matrix))
+        disent = float(np.clip(disentanglement(importance_matrix), 0.0, 1.0))
+        complet = float(np.clip(completeness(importance_matrix), 0.0, 1.0))
 
         # Clamp informativeness to [0, 1] to avoid failures when regressors return negative R²
         train_info = float(np.clip(train_acc, 0.0, 1.0))

@@ -104,8 +104,10 @@ def compute_statistics(
     std = np.std(valid_values, ddof=1) if len(valid_values) > 1 else 0.0
     sem = std / np.sqrt(len(valid_values)) if len(valid_values) > 1 else 0.0
     
-    # Compute confidence interval using t-distribution
-    if len(valid_values) > 1:
+    # Compute confidence interval using t-distribution.
+    # When sem == 0 (all values identical) stats.t.interval produces NaN
+    # because inf * 0 is undefined, so we short-circuit.
+    if len(valid_values) > 1 and sem > 0:
         ci = stats.t.interval(
             confidence_level,
             df=len(valid_values) - 1,
