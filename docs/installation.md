@@ -1,110 +1,69 @@
-# Installation Guide
+# Installation
 
-## Quick Start (Recommended: uv)
+## Quick Install
 
-[uv](https://github.com/astral-sh/uv) is a blazing-fast Python package installer (10-100x faster than pip).
+Use `uv` (10-100x faster than pip):
 
 ```bash
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Create virtual environment
+# Setup
 uv venv
-
-# Activate environment
 source .venv/bin/activate  # macOS/Linux
-# or
-.venv\Scripts\activate  # Windows
+.venv\Scripts\activate     # Windows
 
-# Install package in editable mode
+# Install
 uv pip install -e .
 
-# Install with development dependencies
+# With dev tools
 uv pip install -e ".[dev]"
 ```
 
-## Standard Installation (pip)
+## Standard Install
 
 ```bash
-# Create virtual environment
 python -m venv .venv
-
-# Activate environment
 source .venv/bin/activate  # macOS/Linux
-# or
-.venv\Scripts\activate  # Windows
+.venv\Scripts\activate     # Windows
 
-# Install package in editable mode
 pip install -e .
-
-# Install with development dependencies
-pip install -e ".[dev]"
+pip install -e ".[dev]"    # With dev tools
 ```
 
-## Verify Installation
+## Verify
 
 ```bash
-# Test import
 python -c "import identifiability_guard; print(identifiability_guard.__version__)"
-
-# Run tests
 pytest
 ```
 
-## Development Setup
+## Dev Tools
+
+Installing `.[dev]` gets you:
+- pytest — testing
+- black/isort — formatting
+- flake8 — linting
+- mypy — type checking
+- pytest-cov — coverage
+
+## Build Docs Locally
 
 ```bash
-# Install with all development tools
-uv pip install -e ".[dev]"  # or pip install -e ".[dev]"
-
-# Development tools included:
-# - pytest: Testing framework
-# - pytest-cov: Coverage reporting
-# - black: Code formatter
-# - isort: Import sorter
-# - flake8: Linting
-# - mypy: Type checking
+uv pip install -e ".[docs]"
+mkdocs serve                # Auto-reload at http://127.0.0.1:8000
+mkdocs build                # Static site in site/
+mkdocs gh-deploy            # Deploy to GitHub Pages
 ```
 
-## Documentation Setup
+Doc tools:
+- mkdocs — static site generator
+- mkdocs-material — theme
+- mkdocstrings — auto API docs from docstrings
 
-Build and serve the documentation website locally:
-
-```bash
-# Install documentation dependencies
-uv pip install -e ".[docs]"  # or pip install -e ".[docs]"
-
-# Serve docs locally with auto-reload
-mkdocs serve
-# Open http://127.0.0.1:8000 in your browser
-
-# Build static documentation site
-mkdocs build
-# Output will be in site/ directory
-
-# Deploy to GitHub Pages (optional)
-mkdocs gh-deploy
-```
-
-Documentation tools included:
-- **mkdocs**: Static site generator
-- **mkdocs-material**: Modern, responsive theme
-- **mkdocstrings**: Auto-generates API docs from docstrings
-
-## From PyPI (Coming Soon)
-
-```bash
-uv pip install identifiability-guard  # or pip install identifiability-guard
-```
-
-## System Requirements
+## Requirements
 
 - Python ≥ 3.8
-- Operating System: macOS, Linux, or Windows
-
-## Dependencies
-
-Core dependencies (installed automatically):
 - numpy ≥ 1.20.0
 - scipy ≥ 1.8.0
 - scikit-learn ≥ 1.0.1
@@ -112,21 +71,19 @@ Core dependencies (installed automatically):
 
 ## Troubleshooting
 
-**Issue**: Import errors after installation
+**Import errors after install**
 ```bash
-# Solution: Ensure you're in the activated virtual environment
 which python  # Should show .venv/bin/python
 ```
 
-**Issue**: uv command not found
+**uv command not found**
 ```bash
-# Solution: Restart terminal or add to PATH
 export PATH="$HOME/.cargo/bin:$PATH"
+# Then restart terminal
 ```
 
-**Issue**: Tests failing
+**Tests failing**
 ```bash
-# Solution: Reinstall in editable mode
 uv pip install -e .
 pytest -v
 ```

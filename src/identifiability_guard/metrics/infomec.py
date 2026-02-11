@@ -98,22 +98,23 @@ def _compute_nmi_matrix(
             nmi[i, :] = 0.0
             continue
 
-        for j in range(num_latents):
-            if discrete_latents:
+        if discrete_latents:
+            for j in range(num_latents):
                 mi_ij = metrics.mutual_info_score(
                     processed_sources[:, i], processed_latents[:, j]
                 )
-            else:
-                mi_ij = feature_selection.mutual_info_classif(
-                    processed_latents[:, j][:, None],
-                    processed_sources[:, i],
-                    discrete_features=False,
-                    n_neighbors=n_neighbors,
-                    random_state=random_state,
-                )[0]
-
-            mi_ij = sanitize_mi(mi_ij)
-            nmi[i, j] = clamp(mi_ij / entropy_i)
+                mi_ij = sanitize_mi(mi_ij)
+                nmi[i, j] = clamp(mi_ij / entropy_i)
+        else:
+            mi_row = feature_selection.mutual_info_classif(
+                processed_latents,
+                processed_sources[:, i],
+                discrete_features=False,
+                n_neighbors=n_neighbors,
+                random_state=random_state,
+            )
+            mi_row = np.array([sanitize_mi(v) for v in mi_row], dtype=float)
+            nmi[i, :] = np.clip(mi_row / entropy_i, 0.0, 1.0)
 
     return nmi
 

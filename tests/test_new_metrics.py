@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import warnings
 
-from src.metrics import MIG, TMEX, InfoM, InfoE, InfoC, InfoMECMetric, MetricRegistry
+from identifiability_guard.metrics import MIG, TMEX, InfoM, InfoE, InfoC, InfoMECMetric, MetricRegistry
 
 
 class TestMIG:
