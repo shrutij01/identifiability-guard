@@ -41,10 +41,15 @@ dev = [
     "flake8>=6.0.0",
     "mypy>=1.0.0",
 ]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.4.0",
+    "mkdocstrings[python]>=0.24.0",
+]
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
+where = ["src"]
+include = ["identifiability_guard*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
