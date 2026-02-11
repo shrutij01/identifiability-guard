@@ -12,7 +12,6 @@ The core PCM implementation is copied from pycomets
 (https://github.com/shimenghuang/pycomets, GNU GENERAL PUBLIC LICENSE - Shimeng Huang).
 """
 
-import copy
 import warnings
 
 import numpy as np
@@ -131,7 +130,9 @@ def _data_check(Y, X, Z):
     return Y_new, X_new, Z_new
 
 
-def _split_sample(Y, X, Z, test_split=0.5, rng=np.random.default_rng()):
+def _split_sample(Y, X, Z, test_split=0.5, rng=None):
+    if rng is None:
+        rng = np.random.default_rng()
     nn = Y.shape[0]
     idx_tr = rng.choice(
         np.arange(nn), replace=False, size=int(np.ceil(nn * (1 - test_split)))
@@ -148,16 +149,28 @@ def _pcm_test(
     Y,
     X,
     Z,
-    reg_yonxz: RegressionMethod = RF(),
-    reg_yonz: RegressionMethod = RF(),
-    reg_yhatonz: RegressionMethod = RF(),
-    reg_vonxz: RegressionMethod = RF(),
-    reg_ronz: RegressionMethod = RF(),
+    reg_yonxz=None,
+    reg_yonz=None,
+    reg_yhatonz=None,
+    reg_vonxz=None,
+    reg_ronz=None,
     estimate_variance=True,
     test_split=0.5,
     max_exp=5,
-    rng=np.random.default_rng(),
+    rng=None,
 ):
+    if reg_yonxz is None:
+        reg_yonxz = RF()
+    if reg_yonz is None:
+        reg_yonz = RF()
+    if reg_yhatonz is None:
+        reg_yhatonz = RF()
+    if reg_vonxz is None:
+        reg_vonxz = RF()
+    if reg_ronz is None:
+        reg_ronz = RF()
+    if rng is None:
+        rng = np.random.default_rng()
     """Computation of the PCM test with data splitting."""
 
     # sample splitting
@@ -193,15 +206,22 @@ def _pcm_test(
         else:
             lwr, upr = 0, 10
             counter = 0
-            while np.sign(a(lwr)) * np.sign(a(upr)) == 1:
-                upr += 5
-                counter += 1
-                if counter > max_exp:
-                    raise ValueError(
-                        "Cannot compute variance estimate, try rerunning "
-                        "with `estimate_variance=False`."
-                    )
-            chat = root_scalar(a, method="brentq", bracket=[lwr, upr]).root
+            try:
+                while np.sign(a(lwr)) * np.sign(a(upr)) == 1:
+                    upr += 5
+                    counter += 1
+                    if counter > max_exp:
+                        raise ValueError(
+                            "Cannot compute variance estimate."
+                        )
+                chat = root_scalar(a, method="brentq", bracket=[lwr, upr]).root
+            except ValueError:
+                warnings.warn(
+                    "PCM: bracket search for variance estimate failed; "
+                    "returning pval=1.0 (fail to reject)."
+                )
+                n_te = Yte.shape[0]
+                return 1.0, -np.inf, np.zeros(n_te), np.zeros(n_te)
 
         def vhat(X, Z):
             XZ = np.column_stack([X, Z])
@@ -229,12 +249,9 @@ def _pcm_test(
     rY = Yte - reg_yonz.predict(X=Zte)
     rT = fhats - reg_ronz.predict(X=Zte)
     L = rY * rT
-    stat = (
-        np.sqrt(Yte.shape[0])
-        * np.mean(L)
-        / np.sqrt(np.mean(L**2) - np.mean(L) ** 2)
-    )
-    if np.isnan(stat):
+    var_L = max(np.mean(L**2) - np.mean(L) ** 2, 1e-12)
+    stat = np.sqrt(Yte.shape[0]) * np.mean(L) / np.sqrt(var_L)
+    if not np.isfinite(stat):
         stat = -np.inf
     pval = 1 - norm().cdf(stat)
 
@@ -259,17 +276,29 @@ class PCM:
         X,
         Z,
         rep=1,
-        reg_yonxz: RegressionMethod = RF(),
-        reg_yonz: RegressionMethod = RF(),
-        reg_yhatonz: RegressionMethod = RF(),
-        reg_vonxz: RegressionMethod = RF(),
-        reg_ronz: RegressionMethod = RF(),
+        reg_yonxz=None,
+        reg_yonz=None,
+        reg_yhatonz=None,
+        reg_vonxz=None,
+        reg_ronz=None,
         estimate_variance=True,
         test_split=0.5,
         max_exp=5,
-        rng=np.random.default_rng(),
+        rng=None,
         show_summary=True,
     ):
+        if reg_yonxz is None:
+            reg_yonxz = RF()
+        if reg_yonz is None:
+            reg_yonz = RF()
+        if reg_yhatonz is None:
+            reg_yhatonz = RF()
+        if reg_vonxz is None:
+            reg_vonxz = RF()
+        if reg_ronz is None:
+            reg_ronz = RF()
+        if rng is None:
+            rng = np.random.default_rng()
 
         self.pvals = np.empty(rep)
         self.stats = np.empty(rep)
@@ -336,28 +365,37 @@ def _comp_tmex(Z, Z_hat, fun_reg=None, alpha=0.05, rep=9, seed=None):
     if fun_reg is None:
         fun_reg = LM()
 
+    # Map string-like type to constructor for fresh instances
+    _reg_constructors = {
+        LM: LM,
+        RF: RF,
+        KRR: KRR,
+    }
+    _reg_cls = _reg_constructors.get(type(fun_reg), type(fun_reg))
+
     d = Z.shape[1]
     m = Z_hat.shape[1]
 
-    W = np.eye(m, d)  # expected / perfect correspondence
+    W = np.eye(m, d)
     W_hat = np.zeros((m, d))
 
     rng = np.random.default_rng(seed)
 
-    # go through each block (learned representation)
+    # Precompute all Z_minus_j slices
+    Z_minus = [np.delete(Z, jj, axis=1) for jj in range(d)]
+
     for ii in range(m):
-        # go through each latent (ground-truth factor)
         for jj in range(d):
             pcm = PCM()
             pcm.test(
-                reg_yonxz=copy.deepcopy(fun_reg),
-                reg_ronz=copy.deepcopy(fun_reg),
-                reg_vonxz=copy.deepcopy(fun_reg),
-                reg_yhatonz=copy.deepcopy(fun_reg),
-                reg_yonz=copy.deepcopy(fun_reg),
+                reg_yonxz=_reg_cls(),
+                reg_ronz=_reg_cls(),
+                reg_vonxz=_reg_cls(),
+                reg_yhatonz=_reg_cls(),
+                reg_yonz=_reg_cls(),
                 X=Z[:, jj:jj+1],
                 Y=Z_hat[:, ii:ii+1],
-                Z=np.delete(Z, jj, axis=1),
+                Z=Z_minus[jj],
                 estimate_variance=False,
                 rep=rep,
                 rng=rng,

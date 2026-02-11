@@ -11,6 +11,7 @@ import numpy as np
 import scipy
 from scipy.optimize import linear_sum_assignment
 from scipy.stats import spearmanr
+from typing import Optional
 
 # Optional PyTorch support
 try:
@@ -25,7 +26,7 @@ except ImportError:
 """Below is from the icebeem repo at https://github.com/ilkhem/icebeem/blob/master/metrics/mcc.py"""
 
 
-def rdc(x, y, k=20, s=0.5, nonlinearity="sin"):
+def rdc(x, y, k=20, s=0.5, nonlinearity="sin", rng=None):
     """
     Python implementation of the Randomized Dependence Coefficient (RDC) [1] algorithm
     the RDC is a measure of correlation between two (scalar) random variables x and y
@@ -37,6 +38,7 @@ def rdc(x, y, k=20, s=0.5, nonlinearity="sin"):
         k: number of random projections in RDC
         s: covariance of the Gaussian dist used for sampling the random weights
         nonlinearity: nonlinear feature map used to transform the random projections
+        rng: numpy random Generator for reproducibility
 
     Return:
         rdc_cc: flaot in [0,1] --- the RDC correlation coefficient
@@ -45,13 +47,15 @@ def rdc(x, y, k=20, s=0.5, nonlinearity="sin"):
     [1] https://papers.nips.cc/paper/2013/file/aab3238922bcc25a6f606eb525ffdc56-Paper.pdf
 
     """
-    cx = copula_projection(x, k, s, nonlinearity)
-    cy = copula_projection(y, k, s, nonlinearity)
+    if rng is None:
+        rng = np.random.default_rng()
+    cx = copula_projection(x, k, s, nonlinearity, rng=rng)
+    cy = copula_projection(y, k, s, nonlinearity, rng=rng)
     rdc_cc = largest_cancorr(cx, cy)
     return rdc_cc
 
 
-def copula_projection(x, k=20, s=0.5, nonlinearity="sin"):
+def copula_projection(x, k=20, s=0.5, nonlinearity="sin", rng=None):
     n = x.shape[0]
     k = min(k, n)
     # compute the empirical cdf (copula) of x evaluated at x
@@ -59,7 +63,9 @@ def copula_projection(x, k=20, s=0.5, nonlinearity="sin"):
     # augment the copula with 1
     pt = np.vstack([p, np.ones(n)]).T  # (n, 2)
     # sample k random weights
-    wt = np.random.normal(0, s, size=(pt.shape[1], k))
+    if rng is None:
+        rng = np.random.default_rng()
+    wt = rng.normal(0, s, size=(pt.shape[1], k))
     # wt = np.random.randn(2, k)
     # phix = np.sin(s/pt.shape[1]*pt.dot(wt))  # (n, k)
     if nonlinearity == "sin":
@@ -103,7 +109,7 @@ def rank_array(x):
     return ranks + 1
 
 
-def auction_linear_assignment(x, eps=None, reduce="sum"):
+def auction_linear_assignment(x, eps=None, reduce="sum", max_iter=10000):
     """
     Solve the linear sum assignment problem using the auction algorithm.
     Implementation in pytorch, GPU compatible.
@@ -126,6 +132,8 @@ def auction_linear_assignment(x, eps=None, reduce="sum"):
             If `sum`, sum the entries of cost matrix after assignment.
             If `mean`, compute the mean of the cost matrix after assignment.
             If `none`, return the vector (n,) of assigned column entry per row.
+    :param max_iter: int, optional
+            Maximum number of auction iterations before terminating.
     :return: (torch.Tensor, torch.Tensor, int)
             Tuple of (score after application of reduction method, assignment,
             number of steps in the auction algorithm).
@@ -139,6 +147,13 @@ def auction_linear_assignment(x, eps=None, reduce="sum"):
     n_iter = 0
     while (assignment == -1).any():
         n_iter += 1
+        if n_iter > max_iter:
+            import warnings
+            warnings.warn(
+                f"auction_linear_assignment: reached {max_iter} iterations "
+                f"without full assignment; returning partial result."
+            )
+            break
 
         # -- Bidding --
         # set I of unassigned rows (persons)
@@ -319,7 +334,8 @@ def cov_pt(x, y=None, rowvar=False):
             y = y.t()
         x = torch.cat((x, y), dim=0)
 
-    fact = 1.0 / (x.size(1) - 1)
+    n_samples = x.size(1)
+    fact = 1.0 / max(n_samples - 1, 1)
     x -= torch.mean(x, dim=1, keepdim=True)
     xt = x.t()  # if complex: xt = x.t().conj()
     return fact * x.matmul(xt).squeeze()
@@ -353,10 +369,8 @@ def corrcoef_pt(x, y=None, rowvar=False):
     except RuntimeError:
         # scalar covariance
         return c / c
-    stddev = torch.sqrt(d)
-    # import ipdb
-
-    # ipdb.set_trace()
+    stddev = torch.sqrt(d.clamp(min=0))
+    stddev = torch.where(stddev < 1e-12, torch.ones_like(stddev), stddev)
     c /= stddev[:, None]
     c /= stddev[None, :]
 
@@ -418,7 +432,7 @@ def mean_corr_coef_pt(x, y, method="pearson"):
     return score
 
 
-def mean_corr_coef_np(x, y, method="pearson"):
+def mean_corr_coef_np(x, y, method="pearson", rng=None):
     """
     A numpy implementation of the mean correlation coefficient metric.
 
@@ -431,6 +445,7 @@ def mean_corr_coef_np(x, y, method="pearson"):
                     use Pearson's correlation coefficient
                 'spearman':
                     use Spearman's nonparametric rank correlation coefficient
+    :param rng: numpy random Generator for reproducibility (used by 'rdc' method)
     :return: float
     """
     d = x.shape[1]
@@ -443,7 +458,7 @@ def mean_corr_coef_np(x, y, method="pearson"):
         cc = np.zeros((d, m))
         for i in range(d):
             for j in range(m):
-                cc[i, j] = rdc(x[:, i], y[:, j])
+                cc[i, j] = rdc(x[:, i], y[:, j], rng=rng)
     else:
         raise ValueError("not a valid method: {}".format(method))
     # Replace NaN/Inf (can happen when a column is constant) to keep metric usable
@@ -459,11 +474,13 @@ def mean_corr_coef_np(x, y, method="pearson"):
     return float(np.clip(score, 0.0, 1.0))
 
 
-def mean_corr_coef(x, y, method="pearson"):
+def mean_corr_coef(x, y, method="pearson", rng=None):
     """
     Dispatcher for mean correlation coefficient.
 
     Automatically selects NumPy or PyTorch implementation based on input type.
+
+    :param rng: numpy random Generator for reproducibility (used by 'rdc' method).
     """
     if type(x) != type(y):
         raise ValueError(
@@ -471,7 +488,7 @@ def mean_corr_coef(x, y, method="pearson"):
         )
 
     if isinstance(x, np.ndarray):
-        return mean_corr_coef_np(x, y, method)
+        return mean_corr_coef_np(x, y, method, rng=rng)
     elif HAS_TORCH and isinstance(x, torch.Tensor):
         return mean_corr_coef_pt(x, y, method)
     elif not HAS_TORCH:
@@ -483,11 +500,13 @@ def mean_corr_coef(x, y, method="pearson"):
         raise ValueError(f"not a supported input type: {type(x)}")
 
 
-def mean_corr_coef_out_of_sample(x, y, x_test, y_test, method="pearson"):
+def mean_corr_coef_out_of_sample(x, y, x_test, y_test, method="pearson", rng=None):
     """
     we compare mean correlation coefficients out of sample
     -> we use (x,y) to learn permutation and then evaluate the correlations
     determined by this permutation on (x_test, y_test)
+
+    :param rng: numpy random Generator for reproducibility (used by 'rdc' method).
     """
 
     d = x.shape[1]
@@ -502,11 +521,11 @@ def mean_corr_coef_out_of_sample(x, y, x_test, y_test, method="pearson"):
         cc = np.zeros((d, m))
         for i in range(d):
             for j in range(m):
-                cc[i, j] = rdc(x[:, i], y[:, j])
+                cc[i, j] = rdc(x[:, i], y[:, j], rng=rng)
         cc_test = np.zeros((d, m))
         for i in range(d):
             for j in range(m):
-                cc_test[i, j] = rdc(x_test[:, i], y_test[:, j])
+                cc_test[i, j] = rdc(x_test[:, i], y_test[:, j], rng=rng)
     else:
         raise ValueError("not a valid method: {}".format(method))
     cc = np.abs(cc)
@@ -539,16 +558,18 @@ class MCCMetric(BaseMetric):
         https://github.com/ilkhem/icebeem
     """
 
-    def __init__(self, method: str = "pearson"):
+    def __init__(self, method: str = "pearson", seed: Optional[int] = None):
         """
         Args:
             method: Correlation method - 'pearson', 'spearman', or 'rdc'.
+            seed: Random seed for reproducibility (only used by 'rdc' method).
         """
         if method not in ["pearson", "spearman", "rdc"]:
             raise ValueError(
                 f"method must be 'pearson', 'spearman', or 'rdc', got {method}"
             )
         self.method = method
+        self.seed = seed
 
     def _compute_impl(self, Z: np.ndarray, Z_hat: np.ndarray) -> MetricResult:
         """Compute MCC from samples (supports both NumPy and PyTorch)."""
@@ -556,7 +577,8 @@ class MCCMetric(BaseMetric):
         z_constant = int(np.sum(np.std(Z, axis=0) == 0))
         zhat_constant = int(np.sum(np.std(Z_hat, axis=0) == 0))
 
-        mcc_score = float(mean_corr_coef(Z, Z_hat, method=self.method))
+        rng = np.random.default_rng(self.seed) if self.seed is not None else None
+        mcc_score = float(mean_corr_coef(Z, Z_hat, method=self.method, rng=rng))
         # Replace non-finite scores and clip to [0, 1]
         score_was_nonfinite = not np.isfinite(mcc_score)
         if score_was_nonfinite:

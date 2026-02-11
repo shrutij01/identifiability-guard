@@ -114,3 +114,7 @@ instruction_pile.md
 test_results/
 results/
 context_*
+AUDIT.md
+
+# Docs
+.github/

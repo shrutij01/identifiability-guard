@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.metrics import MCC, DCI
+from src.metrics import MCC, DCI, MIG, R2, TMEX, InfoMEC, InfoM, InfoE, InfoC
 
 
 class TestMCC:
@@ -194,3 +194,125 @@ class TestDCI:
         dci = DCI()
         scores = dci(Z, Z_hat)
         assert isinstance(scores, dict)
+
+
+def _make_data(n=200, d=5, noise=0.1, seed=0):
+    rng = np.random.default_rng(seed)
+    Z = rng.standard_normal((n, d))
+    Z_hat = Z + noise * rng.standard_normal((n, d))
+    return Z, Z_hat
+
+
+class TestReproducibility:
+    """All metrics should be deterministic when seeded."""
+
+    # -- MCC (RDC uses random projections) --
+
+    def test_mcc_rdc_seeded(self):
+        Z, Z_hat = _make_data()
+        r1 = MCC(method="rdc", seed=42).compute(Z, Z_hat)
+        r2 = MCC(method="rdc", seed=42).compute(Z, Z_hat)
+        assert r1.primary_score == r2.primary_score
+
+    def test_mcc_rdc_different_seeds(self):
+        Z, Z_hat = _make_data()
+        r1 = MCC(method="rdc", seed=1).compute(Z, Z_hat)
+        r2 = MCC(method="rdc", seed=2).compute(Z, Z_hat)
+        assert r1.primary_score != r2.primary_score
+
+    def test_mcc_rdc_unseeded_varies(self):
+        Z, Z_hat = _make_data()
+        r1 = MCC(method="rdc").compute(Z, Z_hat)
+        r2 = MCC(method="rdc").compute(Z, Z_hat)
+        assert r1.primary_score != r2.primary_score
+
+    def test_mcc_pearson_deterministic(self):
+        Z, Z_hat = _make_data()
+        r1 = MCC(method="pearson").compute(Z, Z_hat)
+        r2 = MCC(method="pearson").compute(Z, Z_hat)
+        assert r1.primary_score == r2.primary_score
+
+    def test_mcc_spearman_deterministic(self):
+        Z, Z_hat = _make_data()
+        r1 = MCC(method="spearman").compute(Z, Z_hat)
+        r2 = MCC(method="spearman").compute(Z, Z_hat)
+        assert r1.primary_score == r2.primary_score
+
+    # -- DCI (train/test split uses random_state) --
+
+    def test_dci_seeded(self):
+        Z, Z_hat = _make_data()
+        r1 = DCI(random_state=42).compute(Z, Z_hat)
+        r2 = DCI(random_state=42).compute(Z, Z_hat)
+        assert r1.primary_score == r2.primary_score
+
+    def test_dci_different_seeds(self):
+        Z, Z_hat = _make_data()
+        r1 = DCI(random_state=1).compute(Z, Z_hat)
+        r2 = DCI(random_state=2).compute(Z, Z_hat)
+        assert r1.primary_score != r2.primary_score
+
+    # -- InfoMEC (MI estimation + logistic regression use randomness) --
+
+    def test_infomec_seeded(self):
+        Z, Z_hat = _make_data(n=300, d=3)
+        r1 = InfoMEC(random_state=42).compute(Z, Z_hat)
+        r2 = InfoMEC(random_state=42).compute(Z, Z_hat)
+        assert r1.primary_score == r2.primary_score
+
+    def test_infomec_different_seeds(self):
+        Z, Z_hat = _make_data(n=300, d=3)
+        r1 = InfoMEC(random_state=1).compute(Z, Z_hat)
+        r2 = InfoMEC(random_state=2).compute(Z, Z_hat)
+        assert r1.primary_score != r2.primary_score
+
+    def test_infom_seeded(self):
+        Z, Z_hat = _make_data(n=300, d=3)
+        r1 = InfoM(random_state=42).compute(Z, Z_hat)
+        r2 = InfoM(random_state=42).compute(Z, Z_hat)
+        assert r1.primary_score == r2.primary_score
+
+    def test_infoe_seeded(self):
+        Z, Z_hat = _make_data(n=300, d=3)
+        r1 = InfoE(random_state=42).compute(Z, Z_hat)
+        r2 = InfoE(random_state=42).compute(Z, Z_hat)
+        assert r1.primary_score == r2.primary_score
+
+    def test_infoc_seeded(self):
+        Z, Z_hat = _make_data(n=300, d=3)
+        r1 = InfoC(random_state=42).compute(Z, Z_hat)
+        r2 = InfoC(random_state=42).compute(Z, Z_hat)
+        assert r1.primary_score == r2.primary_score
+
+    # -- TMEX (PCM test uses random splits) --
+
+    def test_tmex_seeded(self):
+        Z, Z_hat = _make_data(n=200, d=3)
+        r1 = TMEX(seed=42, rep=3).compute(Z, Z_hat)
+        r2 = TMEX(seed=42, rep=3).compute(Z, Z_hat)
+        assert r1.primary_score == r2.primary_score
+
+    def test_tmex_different_seeds(self):
+        Z, Z_hat = _make_data(n=200, d=3)
+        r1 = TMEX(seed=1, rep=3).compute(Z, Z_hat)
+        r2 = TMEX(seed=2, rep=3).compute(Z, Z_hat)
+        # TMEX returns binary (0/1) scores so different seeds may still match;
+        # we only check that the call succeeds and returns valid scores
+        assert 0.0 <= r1.primary_score <= 1.0
+        assert 0.0 <= r2.primary_score <= 1.0
+
+    # -- MIG (deterministic: histogram binning + discrete MI) --
+
+    def test_mig_deterministic(self):
+        Z, Z_hat = _make_data()
+        r1 = MIG().compute(Z, Z_hat)
+        r2 = MIG().compute(Z, Z_hat)
+        assert r1.primary_score == r2.primary_score
+
+    # -- R2 (deterministic: least squares) --
+
+    def test_r2_deterministic(self):
+        Z, Z_hat = _make_data()
+        r1 = R2().compute(Z, Z_hat)
+        r2 = R2().compute(Z, Z_hat)
+        assert r1.primary_score == r2.primary_score

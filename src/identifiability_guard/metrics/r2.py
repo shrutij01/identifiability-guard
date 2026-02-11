@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 
 from .base import BaseMetric, MetricResult
+from ._numerical import EPS
 
 
 class R2Metric(BaseMetric):
@@ -29,31 +30,22 @@ class R2Metric(BaseMetric):
 
     def _compute_r2(self, Z: np.ndarray, Z_hat: np.ndarray) -> tuple:
         n, d = Z.shape
-        r2_scores = []
-        zero_var_count = 0
 
-        for i in range(d):
-            y = Z[:, i]
-            X = Z_hat
-
-            y_pred = self._least_squares(X, y)
-
-            mse = float(np.mean((y - y_pred) ** 2))
-            var = float(np.var(y))
-
-            # If variance is zero, treat as perfectly explained to avoid div by zero.
-            if var == 0.0:
-                r2_i = 1.0
-                zero_var_count += 1
-            else:
-                r2_i = 1.0 - mse / var
-            r2_scores.append(r2_i)
-
-        if not r2_scores:
+        if d == 0:
             return 0.0, {'zero_variance_factors': 0, 'nonfinite_r2_count': 0}
 
-        # Replace any non-finite values before averaging to keep metric stable
-        r2_array = np.array(r2_scores, dtype=float)
+        # Single lstsq call: solve for all factors simultaneously
+        W, *_ = np.linalg.lstsq(Z_hat, Z, rcond=None)
+        Z_pred = Z_hat @ W
+
+        mse = np.mean((Z - Z_pred) ** 2, axis=0)
+        var = np.var(Z, axis=0)
+
+        zero_var_mask = var < EPS
+        zero_var_count = int(np.sum(zero_var_mask))
+
+        r2_array = np.where(zero_var_mask, 1.0, 1.0 - mse / np.maximum(var, EPS))
+
         nonfinite_count = int(np.sum(~np.isfinite(r2_array)))
         r2_array = np.nan_to_num(r2_array, nan=0.0, posinf=0.0, neginf=0.0)
         nan_info = {
@@ -61,12 +53,6 @@ class R2Metric(BaseMetric):
             'nonfinite_r2_count': nonfinite_count,
         }
         return float(np.mean(r2_array)), nan_info
-
-    @staticmethod
-    def _least_squares(X: np.ndarray, y: np.ndarray) -> np.ndarray:
-        """Solve min_w ||Xw - y||^2 with stable lstsq and return predictions."""
-        w, *_ = np.linalg.lstsq(X, y, rcond=None)
-        return X @ w
 
     @property
     def score_range(self) -> tuple[float, float]:

@@ -24,6 +24,7 @@ from sklearn import ensemble
 from typing import Optional
 
 from .base import BaseMetric, MetricResult
+from ._numerical import safe_entropy_eps, EPS, clamp
 
 
 # ============================================================================
@@ -90,8 +91,12 @@ def compute_importance_gbt(
                 raise
             importance_matrix[:, i] = np.abs(model.feature_importances_)
             # Informativeness = accuracy
-            train_scores.append(np.mean(model.predict(x_train.T) == y_train[i, :]))
-            test_scores.append(np.mean(model.predict(x_test.T) == y_test[i, :]))
+            train_scores.append(
+                np.mean(model.predict(x_train.T) == y_train[i, :])
+            )
+            test_scores.append(
+                np.mean(model.predict(x_test.T) == y_test[i, :])
+            )
         else:
             # Use regressor for continuous factors
             model = ensemble.GradientBoostingRegressor()
@@ -106,37 +111,39 @@ def compute_importance_gbt(
 
 def disentanglement_per_code(importance_matrix):
     """Compute disentanglement score of each code."""
-    # importance_matrix is of shape [num_codes, num_factors].
-    return 1.0 - scipy.stats.entropy(
-        importance_matrix.T + 1e-11, base=importance_matrix.shape[1]
+    eps = safe_entropy_eps(importance_matrix)
+    raw = 1.0 - scipy.stats.entropy(
+        importance_matrix.T + eps, base=importance_matrix.shape[1], axis=0
     )
+    return np.clip(raw, 0.0, 1.0)
 
 
 def disentanglement(importance_matrix):
     """Compute the disentanglement score of the representation."""
     per_code = disentanglement_per_code(importance_matrix)
-    if importance_matrix.sum() == 0.0:
+    if importance_matrix.sum() < EPS:
         importance_matrix = np.ones_like(importance_matrix)
     code_importance = importance_matrix.sum(axis=1) / importance_matrix.sum()
 
-    return np.sum(per_code * code_importance)
+    return clamp(np.sum(per_code * code_importance))
 
 
 def completeness_per_factor(importance_matrix):
     """Compute completeness of each factor."""
-    # importance_matrix is of shape [num_codes, num_factors].
-    return 1.0 - scipy.stats.entropy(
-        importance_matrix + 1e-11, base=importance_matrix.shape[0]
+    eps = safe_entropy_eps(importance_matrix)
+    raw = 1.0 - scipy.stats.entropy(
+        importance_matrix + eps, base=importance_matrix.shape[0], axis=0
     )
+    return np.clip(raw, 0.0, 1.0)
 
 
 def completeness(importance_matrix):
-    """ "Compute completeness of the representation."""
+    """Compute completeness of the representation."""
     per_factor = completeness_per_factor(importance_matrix)
-    if importance_matrix.sum() == 0.0:
+    if importance_matrix.sum() < EPS:
         importance_matrix = np.ones_like(importance_matrix)
     factor_importance = importance_matrix.sum(axis=0) / importance_matrix.sum()
-    return np.sum(per_factor * factor_importance)
+    return clamp(np.sum(per_factor * factor_importance))
 
 
 # ============================================================================

@@ -1,318 +1,179 @@
 # Identifiability Guard
 
-A framework for evaluating identifiability metrics in representation learning.
+A modular framework for evaluating identifiability metrics in representation learning.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
 ## Overview
 
-This project provides a modular codebase for studying identifiability metrics in representation learning. It implements:
+Identifiability Guard provides a systematic approach to studying how well learned representations recover ground-truth latent factors. The framework consists of three core components:
 
-1. **Data Generating Processes (DGPs)**: Generate ground-truth latent factors with different statistical properties
-2. **Encoder Mixings**: Transform latent factors to learned representations in various ways
-3. **Identifiability Metrics**: Evaluate how well learned representations recover ground-truth factors
+1. **Data Generating Processes (DGPs)** - Generate ground-truth latent factors with controlled statistical properties
+2. **Encoder Mixings** - Transform latents to representations in systematic ways
+3. **Identifiability Metrics** - Quantify recovery quality
 
-## Installation
+## Quick Start
+
+### Installation
 
 ```bash
-python -m venv env
-source env/bin/activate
-pip install -r requirements.txt
+# Using uv (recommended - 10-100x faster)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv venv && source .venv/bin/activate
+uv pip install -e .
+
+# Or using pip
+python -m venv .venv && source .venv/bin/activate
+pip install -e .
 ```
 
-## Data Generating Processes (DGPs)
+See [Installation Guide](docs/installation.md) for detailed instructions.
 
-| DGP | Name | Description |
-|-----|------|-------------|
-| D1 | Independent | Mutually independent, non-redundant factors |
-| D2 | Correlated | Statistically dependent but non-redundant factors |
-| D3 | Single-redundant | One factor is a function of another single factor |
-| D4 | Multi-redundant | One factor is a function of multiple factors |
-
-### Example Usage
+### Basic Usage
 
 ```python
-from src.dgp import D1Independent, D2Correlated
+from identifiability_guard.dgp import D1Independent
+from identifiability_guard.encoders import E1ElementwiseLinear
+from identifiability_guard.metrics import MCC, DCI
 
-# Generate independent factors
-dgp = D1Independent(d=5, seed=42)
-Z = dgp.sample(1000)  # Shape: (1000, 5)
-
-# Generate correlated factors
-dgp_corr = D2Correlated(d=5, correlation=0.5, seed=42)
-Z_corr = dgp_corr.sample(1000)
-```
-
-## Encoder Mixings
-
-| Encoder | Name | Description | Status |
-|---------|------|-------------|--------|
-| E1 | Elementwise Linear | Ẑ_j = a_j · Z_π(j), m = d | ✅ |
-| E2 | Elementwise Nonlinear | Ẑ_j = h_j(Z_π(j)), m = d (with strength control) | ✅ |
-| E3 | Linearly Entangled | Ẑ = A · Z (dense mixing), m = d | ✅ |
-| E4 | Undercomplete Linear | Elementwise scaling, m < d | ✅ |
-| E5 | Overcomplete Linear | Redundant scaled copies, m > d | ✅ |
-| E6 | Overcomplete Multicodes | Multiple nonlinear codes per factor, m > d | ✅ |
-| E7 | Overcomplete Linearly Entangled | Ẑ = A · Z (dense, rank-d), m > d | ✅ |
-| E8 | Overcomplete Nonlinear Disjoint | Disjoint sin/cos codes per factor, m > d | ✅ |
-| E9 | Random Gaussian | Random noise (baseline/sanity check), m = d | ✅ |
-
-### Example Usage
-
-```python
-from src.dgp import D1Independent, D2Correlated, D4MultiRedundant
-from src.encoders import (
-    E1ElementwiseLinear, 
-    E2ElementwiseNonlinear,
-    E3LinearlyEntangled,
-    E7OvercompleteEntangled,
-    E8OvercompleteDisjoint,
-)
-
-# Generate data
+# Generate ground-truth factors
 dgp = D1Independent(d=5, seed=42)
 Z = dgp.sample(1000)
 
-# Apply elementwise linear encoding
+# Apply encoder mixing
 encoder = E1ElementwiseLinear(d=5, seed=42)
-Z_hat = encoder.encode(Z)  # Shape: (1000, 5)
+Z_hat = encoder.encode(Z)
 
-# Apply linearly entangled encoding
-encoder_ent = E3LinearlyEntangled(d=5, seed=42)
-Z_hat_ent = encoder_ent.encode(Z)
-
-# E7 Overcomplete linearly entangled (m > d, dense mixing)
-encoder_e7 = E7OvercompleteEntangled(d=5, m=10, condition_number=10.0, seed=42)
-Z_hat_e7 = encoder_e7.encode(Z)  # Shape: (1000, 10)
-
-# E8 Overcomplete disjoint (sin/cos encoding per factor)
-encoder_e8 = E8OvercompleteDisjoint(d=5, codes_per_factor=2, seed=42)
-Z_hat_e8 = encoder_e8.encode(Z)  # Shape: (1000, 10)
-
-# E9 Random Gaussian (baseline/sanity check - should have ~0 metrics)
-encoder_e9 = E9RandomGaussian(d=5, seed=42)
-Z_hat_e9 = encoder_e9.encode(Z)  # Shape: (1000, 5) - random noise
-
-# Parameterized nonlinearity strength (0=linear, 1=fully nonlinear)
-encoder_e2 = E2ElementwiseNonlinear(d=5, nonlinearity_strength=0.5, seed=42)
-Z_hat_e2 = encoder_e2.encode(Z)
-
-# Parameterized redundancy strength (noise in redundant factors)
-dgp_d4 = D4MultiRedundant(d=5, r=1, noise_std=0.1, seed=42)
-Z_d4 = dgp_d4.sample(1000)
-```
-
-## Identifiability Metrics
-
-### MCC (Mean Correlation Coefficient) — 🚧 TODO
-
-$$\text{MCC}(\rho) = \frac{1}{k} \max_{\pi \in S_k} \sum_{i=1}^k |\text{Corr}(Z_i, \hat{Z}_{\pi(i)})|$$
-
-### DCI (Disentanglement, Completeness, Informativeness) — 🚧 TODO
-
-- **Disentanglement**: Each code depends on at most one factor
-- **Completeness**: Each factor is captured by at most one code
-- **Informativeness**: How well codes predict factors
-
-### Example Usage
-
-```python
-from src.metrics import MCC, DCI
-
-# Compute MCC
+# Evaluate identifiability
 mcc = MCC()
-score = mcc.compute(Z, Z_hat)  # Returns float in [0, 1]
-
-# Compute DCI
 dci = DCI()
-scores = dci.compute(Z, Z_hat)  # Returns dict with D, C, I scores
-print(f"Disentanglement: {scores['disentanglement']:.3f}")
-print(f"Completeness: {scores['completeness']:.3f}")
-print(f"Informativeness: {scores['informativeness']:.3f}")
+
+print(f"MCC: {mcc.compute(Z, Z_hat).primary_score:.3f}")
+print(f"DCI: {dci.compute(Z, Z_hat).subscores['disentanglement']:.3f}")
 ```
+
+## Documentation
+
+📚 **[View Documentation](https://shrutij01.github.io/identifiability-guard/)** | **[GitHub Docs](docs/index.md)**
+
+- [Installation Guide](docs/installation.md)
+- [Data Generating Processes](docs/dgp.md)
+- [Encoder Mixings](docs/encoders.md)
+- [Identifiability Metrics](docs/metrics.md)
+- [Examples & Tutorials](docs/examples.md)
+- [API Reference](docs/api/index.md)
+- [Contributing Guide](docs/contributing.md)
+
+## Components
+
+### Data Generating Processes (DGPs)
+
+| DGP | Description |
+|-----|-------------|
+| D1 | Independent, non-redundant factors |
+| D2 | Correlated, non-redundant factors |
+| D3 | Single-factor redundant |
+| D4 | Multi-factor redundant |
+
+[See full DGP documentation →](docs/dgp.md)
+
+### Encoder Mixings
+
+| Encoder | Description | Dimensionality |
+|---------|-------------|----------------|
+| E1 | Elementwise Linear | m = d |
+| E2 | Elementwise Nonlinear | m = d |
+| E3 | Linearly Entangled | m = d |
+| E4 | Undercomplete Linear | m < d |
+| E5 | Overcomplete Linear | m > d |
+| E6 | Overcomplete Multicodes | m > d |
+| E7 | Overcomplete Entangled | m > d |
+| E8 | Overcomplete Disjoint | m > d |
+| E9/E10 | Random Baselines | m = d |
+
+[See full encoder documentation →](docs/encoders.md)
+
+### Identifiability Metrics
+
+| Metric | Description | Range |
+|--------|-------------|-------|
+| MCC | Mean Correlation Coefficient | [0, 1] |
+| DCI | Disentanglement, Completeness, Informativeness | [0, 1] |
+| R² | Coefficient of Determination | [0, 1] |
+| MIG | Mutual Information Gap | [0, ∞) |
+| T-MEX | Testing for Measurement Exchangeability | [0, 1] |
+| InfoMEC | Modularity, Explicitness, Compactness | [0, 1] |
+
+[See full metrics documentation →](docs/metrics.md)
+
+## Examples
+
+Run comprehensive evaluations:
+
+```bash
+# Generate DGP × Encoder heatmap
+python examples/evaluate_all_combinations_combined.py
+
+# Sample size sensitivity analysis
+python examples/evaluate_sensitivity.py \
+    --sweep-samples 500,1000,5000,10000 \
+    --dgp D1 --encoder E1 --n-seeds 10
+```
+
+[See more examples →](docs/examples.md)
+
+## Development
+
+```bash
+# Install with development dependencies
+uv pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Format code
+black src/ tests/ && isort src/ tests/
+
+# Type check
+mypy src/
+```
+
+[See contributing guide →](docs/contributing.md)
 
 ## Project Structure
 
 ```
 identifiability-guard/
-├── src/
-│   ├── __init__.py
-│   ├── dgp/                    # Data Generating Processes
-│   │   ├── __init__.py
-│   │   ├── base.py            # BaseDGP abstract class
-│   │   ├── d1_independent.py  # D1: Independent factors
-│   │   ├── d2_correlated.py   # D2: Correlated factors
-│   │   ├── d3_single_redundant.py  # D3: Single-factor redundant
-│   │   └── d4_multi_redundant.py   # D4: Multi-factor redundant
-│   ├── encoders/               # Encoder Mixings
-│   │   ├── __init__.py
-│   │   ├── base.py            # BaseEncoder abstract class
-│   │   ├── e1_elementwise_linear.py
-│   │   ├── e2_elementwise_nonlinear.py
-│   │   ├── e3_linearly_entangled.py
-│   │   ├── e4_undercomplete_linear.py
-│   │   ├── e5_overcomplete_linear.py
-│   │   ├── e6_overcomplete_multicodes.py
-│   │   ├── e7_overcomplete_entangled.py   # NEW: E7
-│   │   ├── e8_overcomplete_disjoint.py    # NEW: E8
-│   │   └── e9_random_gaussian.py          # NEW: E9 (baseline)
-│   ├── evaluation/              # NEW: Evaluation Utilities
-│   │   ├── __init__.py
-│   │   ├── timing.py           # Timing and memory profiling
-│   │   ├── multi_seed.py       # Multi-seed evaluation with statistics
-│   │   └── sensitivity.py      # Parameter sweep and sensitivity analysis
-│   └── metrics/                # Identifiability Metrics
-│       ├── __init__.py
-│       ├── base.py            # BaseMetric abstract class
-│       ├── mcc.py             # MCC metric
-│       └── dci.py             # DCI metric
-├── tests/
-│   ├── __init__.py
-│   ├── test_dgp.py
-│   ├── test_encoders.py
-│   ├── test_evaluation.py      # NEW: Tests for evaluation utilities
-│   └── test_metrics.py
-├── examples/
-│   ├── evaluate_all_combinations_combined.py
-│   └── evaluate_sensitivity.py  # NEW: Sensitivity analysis script
-├── pyproject.toml
-└── README.md
+├── src/identifiability_guard/   # Source code
+│   ├── dgp/                      # Data generating processes
+│   ├── encoders/                 # Encoder mixings
+│   ├── metrics/                  # Identifiability metrics
+│   └── evaluation/               # Evaluation utilities
+├── tests/                        # Unit tests
+├── examples/                     # Example scripts
+├── docs/                         # Documentation
+├── pyproject.toml                # Package configuration
+└── README.md                     # This file
 ```
 
-## Evaluation Utilities
+## Citation
 
-The framework includes comprehensive evaluation utilities for analyzing identifiability metrics under different conditions.
+If you use this framework in your research, please cite:
 
-### Timing and Memory Profiling
-
-```python
-from src.evaluation import time_block, memory_profiler, profile_block
-
-# Time a code block
-with time_block("Data generation"):
-    Z = dgp.sample(10000)
-
-# Profile memory usage
-with memory_profiler("Model training"):
-    model.fit(X, y)
-
-# Combined profiling
-with profile_block("Full evaluation") as profile:
-    results = evaluate_model(data)
-print(f"Time: {profile['elapsed']:.2f}s, Peak Memory: {profile['peak_mb']:.2f} MB")
-```
-
-### Multi-Seed Evaluation
-
-```python
-from src.evaluation import run_multi_seed_evaluation
-
-def eval_fn(seed):
-    dgp = D1Independent(d=5, seed=seed)
-    encoder = E1ElementwiseLinear(d=5, seed=seed)
-    Z = dgp.sample(1000)
-    Z_hat = encoder.encode(Z)
-    return {"mcc": compute_mcc(Z, Z_hat)}
-
-# Run with multiple seeds and get statistics
-raw_results, aggregated = run_multi_seed_evaluation(
-    eval_fn,
-    n_seeds=10,
-    base_seed=42,
-)
-
-# Access mean, std, confidence intervals
-print(f"MCC: {aggregated['mcc']['mean']:.3f} ± {aggregated['mcc']['std']:.3f}")
-print(f"95% CI: [{aggregated['mcc']['ci_lower']:.3f}, {aggregated['mcc']['ci_upper']:.3f}]")
-```
-
-### Sensitivity Analysis
-
-```bash
-# Sweep over sample sizes
-python examples/evaluate_sensitivity.py \
-    --sweep-samples 1000,5000,10000 \
-    --dgp D1 --encoder E1 \
-    --n-seeds 5
-
-# Sweep over correlation values (D2)
-python examples/evaluate_sensitivity.py \
-    --sweep-correlation 0.0,0.3,0.5,0.7,0.9 \
-    --encoder E2 \
-    --n-seeds 10
-
-# Sweep over nonlinearity strength (E2)
-python examples/evaluate_sensitivity.py \
-    --sweep-nonlinearity 0.0,0.25,0.5,0.75,1.0 \
-    --dgp D1 \
-    --n-seeds 5
-
-# Results are saved as JSON and camera-ready plots
-```
-
-## Example Scripts
-
-### Combined Heatmap Visualization
-
-Generate a comprehensive heatmap showing all DGP × Encoder combinations:
-
-```bash
-# Basic usage (default: 5000 samples, 4 factors)
-python examples/evaluate_all_combinations_combined.py
-
-# Custom configuration
-python examples/evaluate_all_combinations_combined.py \
-    --samples 10000 \
-    --factors 6 \
-    --seed 123 \
-    --output results/my_heatmap.png
-```
-
-This produces:
-- A multi-panel figure with one heatmap per DGP
-- Each cell shows metric scores (0-100 scale) for encoder × metric combinations  
-- A timing/memory profiling table at the bottom
-- Title includes samples and factors configuration
-
-### Sensitivity Analysis Sweep
-
-Run comprehensive sensitivity analysis with statistical aggregation:
-
-```bash
-# Sample size sweep (all 7 metrics plotted)
-python examples/evaluate_sensitivity.py \
-    --sweep-samples 500,1000,2500,5000,10000 \
-    --dgp D1 --encoder E1 \
-    --n-seeds 10
-
-# Correlation sweep for D2
-python examples/evaluate_sensitivity.py \
-    --sweep-correlation 0.0,0.2,0.4,0.6,0.8,1.0 \
-    --dgp D2 --encoder E2 \
-    --n-seeds 5
-
-# Select specific metrics to compute (faster)
-python examples/evaluate_sensitivity.py \
-    --sweep-samples 1000,5000,10000 \
-    --metrics dci_disentanglement,mcc_pearson,r2 \
-    --n-seeds 5
-
-# Run all metrics
-python examples/evaluate_sensitivity.py \
-    --sweep-samples 1000,5000,10000 \
-    --all-metrics \
-    --n-seeds 5
-```
-
-Output includes:
-- JSON files with raw results and statistics
-- Camera-ready sensitivity plots with 95% CI error bands
-- Support for 7 metrics: DCI (3 subscores), MCC (3 variants), R²
-
-## Running Tests
-
-```bash
-pytest tests/
+```bibtex
+@software{identifiability_guard,
+  title = {Identifiability Guard: A Framework for Evaluating Identifiability Metrics},
+  author = {Identifiability Guard Team},
+  year = {2024},
+  url = {https://github.com/shrutij01/identifiability-guard}
+}
 ```
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) for details.
+
+## Acknowledgments
+
+This framework implements and extends identifiability metrics from the representation learning literature. See individual metric documentation for references.
