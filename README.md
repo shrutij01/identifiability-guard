@@ -55,7 +55,7 @@ print(f"DCI: {dci.compute(Z, Z_hat).subscores['disentanglement']:.3f}")
 
 ## Documentation
 
-📚 **[Full Documentation](docs/index.md)**
+📚 **[View Documentation](https://shrutij01.github.io/identifiability-guard/)** | **[GitHub Docs](docs/index.md)**
 
 - [Installation Guide](docs/installation.md)
 - [Data Generating Processes](docs/dgp.md)
@@ -166,7 +166,7 @@ If you use this framework in your research, please cite:
   title = {Identifiability Guard: A Framework for Evaluating Identifiability Metrics},
   author = {Identifiability Guard Team},
   year = {2024},
-  url = {https://github.com/yourusername/identifiability-guard}
+  url = {https://github.com/shrutij01/identifiability-guard}
 }
 ```
 
