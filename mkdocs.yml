@@ -98,6 +98,10 @@ nav:
       - Encoder Mixings: encoders.md
       - Identifiability Metrics: metrics.md
       - Examples: examples.md
+  - Technical Details:
+      - Numerical Stability: numerical_stability.md
+      - Computational Efficiency: computational_efficiency.md
+      - Reproducibility: reproducibility.md
   - API Reference:
       - Overview: api/index.md
       - DGP: api/dgp.md
