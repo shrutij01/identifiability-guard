@@ -15,6 +15,7 @@ Identifiability Guard provides a systematic approach to studying how well learne
 - [Installation](installation.md)
 - [API Reference](api/index.md)
 - [Examples](examples.md)
+- [Experiments](experiments.md)
 - [Contributing](contributing.md)
 
 ## Quick Example
