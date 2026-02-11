@@ -7,6 +7,7 @@ Welcome to the Identifiability Guard documentation!
 1. **[Installation](installation.md)** - Setup instructions for uv and pip
 2. **[Quick Start](index.md)** - Basic usage example
 3. **[Examples](examples.md)** - Practical usage patterns
+4. **[Experiments](experiments.md)** - Running experiment scripts and sweeps
 
 ## Core Components
 
