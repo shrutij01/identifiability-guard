@@ -3,7 +3,10 @@
 import numpy as np
 import pytest
 
-from src.metrics import MCC, DCI, MIG, R2, TMEX, InfoMEC, InfoM, InfoE, InfoC
+from sklearn import feature_selection, metrics, preprocessing
+
+from identifiability_guard.metrics import MCC, DCI, MIG, R2, TMEX, InfoMEC, InfoM, InfoE, InfoC
+from identifiability_guard.metrics.infomec import _compute_nmi_matrix, _process_sources, EPS, sanitize_mi, clamp
 
 
 class TestMCC:
@@ -194,6 +197,55 @@ class TestDCI:
         dci = DCI()
         scores = dci(Z, Z_hat)
         assert isinstance(scores, dict)
+
+
+class TestInfoMECVectorization:
+    """Tests for InfoMEC NMI vectorization correctness."""
+
+    def test_vectorisation_matches_loop(self):
+        rng = np.random.default_rng(0)
+        n = 200
+        num_sources = 4
+        num_latents = 6
+        sources = rng.normal(size=(n, num_sources))
+        latents = rng.normal(size=(n, num_latents))
+
+        n_neighbors = 5
+        num_bins = 10
+        random_state = 0
+
+        nmi_vec = _compute_nmi_matrix(
+            sources=sources,
+            latents=latents,
+            discrete_latents=False,
+            n_neighbors=n_neighbors,
+            num_bins=num_bins,
+            random_state=random_state,
+        )
+
+        processed_sources = _process_sources(sources, num_bins=num_bins)
+        processed_latents = preprocessing.StandardScaler().fit_transform(latents)
+
+        nmi_loop = np.empty((num_sources, num_latents))
+        for i in range(num_sources):
+            entropy_i = metrics.mutual_info_score(
+                processed_sources[:, i], processed_sources[:, i]
+            )
+            if entropy_i < EPS:
+                nmi_loop[i, :] = 0.0
+                continue
+            for j in range(num_latents):
+                mi_ij = feature_selection.mutual_info_classif(
+                    processed_latents[:, j][:, None],
+                    processed_sources[:, i],
+                    discrete_features=False,
+                    n_neighbors=n_neighbors,
+                    random_state=random_state,
+                )[0]
+                mi_ij = sanitize_mi(mi_ij)
+                nmi_loop[i, j] = clamp(mi_ij / entropy_i)
+
+        np.testing.assert_allclose(nmi_vec, nmi_loop, rtol=1e-2, atol=2e-4)
 
 
 def _make_data(n=200, d=5, noise=0.1, seed=0):

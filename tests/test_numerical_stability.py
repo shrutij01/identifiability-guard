@@ -4,16 +4,16 @@ import numpy as np
 import pytest
 import warnings
 
-from src.metrics import MIG, MCC, TMEX, InfoM, InfoE, InfoC, InfoMECMetric
-from src.metrics.r2 import R2Metric
-from src.metrics.dci import (
+from identifiability_guard.metrics import MIG, MCC, TMEX, InfoM, InfoE, InfoC, InfoMECMetric
+from identifiability_guard.metrics.r2 import R2Metric
+from identifiability_guard.metrics.dci import (
     disentanglement,
     completeness,
     disentanglement_per_code,
     completeness_per_factor,
 )
-from src.metrics.mig import _compute_mig, histogram_discretize, discrete_mutual_info
-from src.metrics.mcc import corrcoef_pt, cov_pt
+from identifiability_guard.metrics.mig import _compute_mig, histogram_discretize, discrete_mutual_info
+from identifiability_guard.metrics.mcc import corrcoef_pt, cov_pt
 
 
 class TestMIGSingleCode:

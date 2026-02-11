@@ -1,51 +1,47 @@
 # Identifiability Guard
 
-A modular framework for evaluating identifiability metrics in representation learning.
+Benchmark framework for testing identifiability metrics. Generate controlled ground-truth factors, mix them in specific ways, measure how well metrics detect recovery.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-## Overview
+## What This Does
 
-Identifiability Guard provides a systematic approach to studying how well learned representations recover ground-truth latent factors. The framework consists of three core components:
+Three pieces: generate latent factors Z with known structure → apply systematic transformations → measure recovery with standard metrics.
 
-1. **Data Generating Processes (DGPs)** - Generate ground-truth latent factors with controlled statistical properties
-2. **Encoder Mixings** - Transform latents to representations in systematic ways
-3. **Identifiability Metrics** - Quantify recovery quality
+1. **DGPs** — Generate Z: independent, correlated, or redundant factors
+2. **Encoders** — Transform Z → Ẑ: linear, nonlinear, overcomplete, entangled
+3. **Metrics** — Score recovery: MCC, DCI, R², MIG, T-MEX, InfoMEC
 
-## Quick Start
-
-### Installation
+## Install
 
 ```bash
-# Using uv (recommended - 10-100x faster)
+# Fast path (uv is 10-100x faster than pip)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv && source .venv/bin/activate
 uv pip install -e .
 
-# Or using pip
+# Standard path
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 ```
 
-See [Installation Guide](docs/installation.md) for detailed instructions.
-
-### Basic Usage
+## Use It
 
 ```python
 from identifiability_guard.dgp import D1Independent
 from identifiability_guard.encoders import E1ElementwiseLinear
 from identifiability_guard.metrics import MCC, DCI
 
-# Generate ground-truth factors
+# Step 1: Generate 5 independent factors, 1000 samples
 dgp = D1Independent(d=5, seed=42)
 Z = dgp.sample(1000)
 
-# Apply encoder mixing
+# Step 2: Apply diagonal scaling + permutation
 encoder = E1ElementwiseLinear(d=5, seed=42)
 Z_hat = encoder.encode(Z)
 
-# Evaluate identifiability
+# Step 3: Measure recovery
 mcc = MCC()
 dci = DCI()
 
@@ -53,117 +49,94 @@ print(f"MCC: {mcc.compute(Z, Z_hat).primary_score:.3f}")
 print(f"DCI: {dci.compute(Z, Z_hat).subscores['disentanglement']:.3f}")
 ```
 
-## Documentation
+## Docs
 
-📚 **[View Documentation](https://shrutij01.github.io/identifiability-guard/)** | **[GitHub Docs](docs/index.md)**
+📚 **[Full docs](https://shrutij01.github.io/identifiability-guard/)** | **[GitHub docs](docs/index.md)**
 
-- [Installation Guide](docs/installation.md)
-- [Data Generating Processes](docs/dgp.md)
-- [Encoder Mixings](docs/encoders.md)
-- [Identifiability Metrics](docs/metrics.md)
-- [Examples & Tutorials](docs/examples.md)
-- [API Reference](docs/api/index.md)
-- [Contributing Guide](docs/contributing.md)
+Quick links:
+- [Installation](docs/installation.md) — get running
+- [DGPs](docs/dgp.md) — generate factors
+- [Encoders](docs/encoders.md) — transform factors
+- [Metrics](docs/metrics.md) — score recovery
+- [Examples](docs/examples.md) — code walkthroughs
+- [Contributing](docs/contributing.md) — add components
 
-## Components
+## What's Included
 
-### Data Generating Processes (DGPs)
+**DGPs** — 4 factor structures
 
-| DGP | Description |
-|-----|-------------|
-| D1 | Independent, non-redundant factors |
-| D2 | Correlated, non-redundant factors |
-| D3 | Single-factor redundant |
-| D4 | Multi-factor redundant |
+| Code | What it does |
+|------|--------------|
+| D1 | Independent Gaussians |
+| D2 | Correlated factors |
+| D3 | One factor copies another |
+| D4 | One factor depends on multiple |
 
-[See full DGP documentation →](docs/dgp.md)
+**Encoders** — 10 transformation types
 
-### Encoder Mixings
+| Code | Transform | Dims |
+|------|-----------|------|
+| E1 | Diagonal scaling + permutation | m = d |
+| E2 | Elementwise nonlinear | m = d |
+| E3 | Dense linear mixing | m = d |
+| E4 | Dimensionality reduction | m < d |
+| E5 | Overcomplete linear | m > d |
+| E6 | Multiple codes per factor | m > d |
+| E7 | Overcomplete + entangled | m > d |
+| E8 | Disjoint sin/cos codes | m > d |
+| E9/E10 | Random noise baselines | m = d |
 
-| Encoder | Description | Dimensionality |
-|---------|-------------|----------------|
-| E1 | Elementwise Linear | m = d |
-| E2 | Elementwise Nonlinear | m = d |
-| E3 | Linearly Entangled | m = d |
-| E4 | Undercomplete Linear | m < d |
-| E5 | Overcomplete Linear | m > d |
-| E6 | Overcomplete Multicodes | m > d |
-| E7 | Overcomplete Entangled | m > d |
-| E8 | Overcomplete Disjoint | m > d |
-| E9/E10 | Random Baselines | m = d |
+**Metrics** — 6 recovery tests
 
-[See full encoder documentation →](docs/encoders.md)
+| Code | What it measures |
+|------|------------------|
+| MCC | Correlation-based matching |
+| DCI | Disentanglement + completeness + informativeness |
+| R² | Linear prediction quality |
+| MIG | Mutual information gaps |
+| T-MEX | Statistical exchangeability |
+| InfoMEC | Info-theoretic decomposition |
 
-### Identifiability Metrics
-
-| Metric | Description | Range |
-|--------|-------------|-------|
-| MCC | Mean Correlation Coefficient | [0, 1] |
-| DCI | Disentanglement, Completeness, Informativeness | [0, 1] |
-| R² | Coefficient of Determination | [0, 1] |
-| MIG | Mutual Information Gap | [0, ∞) |
-| T-MEX | Testing for Measurement Exchangeability | [0, 1] |
-| InfoMEC | Modularity, Explicitness, Compactness | [0, 1] |
-
-[See full metrics documentation →](docs/metrics.md)
-
-## Examples
-
-Run comprehensive evaluations:
+## Run Experiments
 
 ```bash
-# Generate DGP × Encoder heatmap
+# Full DGP × Encoder grid
 python examples/evaluate_all_combinations_combined.py
 
-# Sample size sensitivity analysis
+# Sample size sweep
 python examples/evaluate_sensitivity.py \
     --sweep-samples 500,1000,5000,10000 \
     --dgp D1 --encoder E1 --n-seeds 10
 ```
 
-[See more examples →](docs/examples.md)
-
-## Development
+## Dev Setup
 
 ```bash
-# Install with development dependencies
-uv pip install -e ".[dev]"
-
-# Run tests
-pytest
-
-# Format code
-black src/ tests/ && isort src/ tests/
-
-# Type check
-mypy src/
+uv pip install -e ".[dev]"  # Install dev tools
+pytest                       # Run tests
+black src/ tests/           # Format
+mypy src/                   # Type check
 ```
 
-[See contributing guide →](docs/contributing.md)
-
-## Project Structure
+## Structure
 
 ```
-identifiability-guard/
-├── src/identifiability_guard/   # Source code
-│   ├── dgp/                      # Data generating processes
-│   ├── encoders/                 # Encoder mixings
-│   ├── metrics/                  # Identifiability metrics
-│   └── evaluation/               # Evaluation utilities
-├── tests/                        # Unit tests
-├── examples/                     # Example scripts
-├── docs/                         # Documentation
-├── pyproject.toml                # Package configuration
-└── README.md                     # This file
+src/identifiability_guard/
+├── dgp/         # Factor generators
+├── encoders/    # Transformations
+├── metrics/     # Recovery scores
+└── evaluation/  # Utilities
+
+tests/           # Unit tests
+examples/        # Runnable experiments
+docs/            # Documentation
 ```
 
 ## Citation
 
-If you use this framework in your research, please cite:
-
 ```bibtex
 @software{identifiability_guard,
-  title = {Identifiability Guard: A Framework for Evaluating Identifiability Metrics},
+  title = {Identifiability Guard},
   author = {Identifiability Guard Team},
   year = {2024},
   url = {https://github.com/shrutij01/identifiability-guard}
@@ -172,8 +145,4 @@ If you use this framework in your research, please cite:
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
-
-## Acknowledgments
-
-This framework implements and extends identifiability metrics from the representation learning literature. See individual metric documentation for references.
+MIT

@@ -3,7 +3,7 @@ Mutual Information Gap (MIG) metric.
 
 Based on DisentanglementLib:
 Apache License, Version 2.0, January 2004
-https://github.com/google-research/disentanglement_lib
+https://github.com/google-research/disentanglement_lib/blob/master/disentanglement_lib/evaluation/metrics/mig.py
 
 MIG measures disentanglement by computing the gap between the two highest
 mutual information values for each factor. A higher gap indicates that
@@ -25,8 +25,9 @@ def histogram_discretize(
     """Discretize continuous values into histogram bins."""
     discretized = np.zeros_like(target)
     for i in range(target.shape[0]):
-        discretized[i, :] = np.digitize(target[i, :], np.histogram(
-            target[i, :], num_bins)[1][:-1])
+        discretized[i, :] = np.digitize(
+            target[i, :], np.histogram(target[i, :], num_bins)[1][:-1]
+        )
     return discretized
 
 
@@ -96,14 +97,18 @@ def _compute_mig(
 
     if not np.any(valid_mask):
         # All factors constant → score is undefined, return 0.
-        return 0.0, {'zero_entropy_factors': num_zero_entropy}
+        return 0.0, {"zero_entropy_factors": num_zero_entropy}
 
     if sorted_m.shape[0] < 2:
         # Only one code: gap is the top MI value itself (no second row to subtract).
         per_factor = sorted_m[0, valid_mask] / entropy[valid_mask]
     else:
-        per_factor = (sorted_m[0, valid_mask] - sorted_m[1, valid_mask]) / entropy[valid_mask]
-    return float(np.mean(per_factor)), {'zero_entropy_factors': num_zero_entropy}
+        per_factor = (
+            sorted_m[0, valid_mask] - sorted_m[1, valid_mask]
+        ) / entropy[valid_mask]
+    return float(np.mean(per_factor)), {
+        "zero_entropy_factors": num_zero_entropy
+    }
 
 
 def _compute_mig_from_samples(
@@ -127,7 +132,7 @@ def _compute_mig_from_samples(
         Tuple of (mig_score, nan_info).
     """
     # Transpose to (num_dims, num_samples) format used by disentanglement_lib
-    mus_train = codes.T   # (num_codes, num_samples)
+    mus_train = codes.T  # (num_codes, num_samples)
     ys_train = factors.T  # (num_factors, num_samples)
 
     # Discretize codes (same as original)
@@ -143,34 +148,34 @@ def _compute_mig_from_samples(
 class MIGMetric(BaseMetric):
     """
     Mutual Information Gap (MIG) metric.
-    
+
     MIG measures disentanglement by computing the normalized gap between
     the highest and second-highest mutual information values for each
     ground-truth factor. A factor is well-disentangled if it has high MI
     with exactly one code dimension.
-    
+
     MIG = mean_j [(MI_top(j) - MI_second(j)) / H(factor_j)]
-    
+
     Higher scores indicate better disentanglement/identifiability.
-    
+
     Reference:
         Chen et al., "Isolating Sources of Disentanglement in VAEs", NeurIPS 2018.
         https://arxiv.org/abs/1802.04942
-    
+
     Args:
         num_bins: Number of bins for discretizing continuous values.
     """
-    
+
     def __init__(self, num_bins: int = 20):
         if num_bins < 2:
             raise ValueError(f"num_bins must be >= 2, got {num_bins}")
         self.num_bins = num_bins
-    
+
     @property
     def required_min_samples(self) -> int:
         """MIG needs enough samples for reliable histogram binning."""
         return max(30, self.num_bins * 2)  # More permissive: 2x bins minimum
-    
+
     def _compute_impl(self, Z: np.ndarray, Z_hat: np.ndarray) -> MetricResult:
         """Compute MIG score from samples."""
         mig_score, nan_info = _compute_mig_from_samples(
@@ -185,53 +190,59 @@ class MIGMetric(BaseMetric):
             primary_score=mig_score,
             subscores=None,
             metadata={
-                'num_bins': self.num_bins,
-                'num_factors': Z.shape[1],
-                'num_codes': Z_hat.shape[1],
-                'nan_info': nan_info,
+                "num_bins": self.num_bins,
+                "num_factors": Z.shape[1],
+                "num_codes": Z_hat.shape[1],
+                "nan_info": nan_info,
             },
         )
-    
+
     def compute_from_matrix(self, R: np.ndarray) -> MetricResult:
         """
         Compute MIG from a precomputed mutual information matrix.
-        
+
         This allows computing MIG when you already have the MI matrix
         between codes and factors (e.g., from another metric computation).
-        
+
         Args:
             R: MI matrix of shape (num_factors, num_codes) where R[j, i] is
                the mutual information between factor j and code i.
-        
+
         Returns:
             MetricResult with MIG score.
-        
+
         Note:
             This requires normalized MI values and factor entropies to be
             meaningful. For raw MI matrices, the score may not be in [0, 1].
         """
         # Transpose to (num_codes, num_factors) format
         mi_matrix = R.T
-        
+
         num_factors = R.shape[0]
-        
+
         # Sort MI values for each factor (descending)
         sorted_mi = np.sort(mi_matrix, axis=0)[::-1]
-        
+
         # Compute gap (without entropy normalization since we don't have it)
         # This will give an unnormalized score
         mig_per_factor = np.zeros(num_factors)
         for j in range(num_factors):
             max_mi = sorted_mi[0, j]
             if max_mi > 1e-10:
-                gap = sorted_mi[0, j] - sorted_mi[1, j] if sorted_mi.shape[0] > 1 else sorted_mi[0, j]
-                mig_per_factor[j] = gap / max_mi  # Normalize by max instead of entropy
+                gap = (
+                    sorted_mi[0, j] - sorted_mi[1, j]
+                    if sorted_mi.shape[0] > 1
+                    else sorted_mi[0, j]
+                )
+                mig_per_factor[j] = (
+                    gap / max_mi
+                )  # Normalize by max instead of entropy
             else:
                 mig_per_factor[j] = 0.0
-        
+
         mig_score = float(np.clip(np.mean(mig_per_factor), 0.0, 1.0))
-        
+
         return MetricResult(
             primary_score=mig_score,
-            metadata={'computed_from_matrix': True},
+            metadata={"computed_from_matrix": True},
         )
