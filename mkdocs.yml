@@ -1,0 +1,108 @@
+site_name: Identifiability Guard
+site_description: A framework for evaluating identifiability metrics in representation learning
+site_author: Identifiability Guard Team
+repo_url: https://github.com/shrutij01/identifiability-guard
+repo_name: identifiability-guard
+
+theme:
+  name: material
+  palette:
+    # Light mode - vibrant cyberpunk colors
+    - scheme: default
+      primary: deep purple
+      accent: pink
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode - sleek neon aesthetic
+    - scheme: slate
+      primary: purple
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - navigation.instant
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.arithmatex:
+      generic: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+extra_javascript:
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/shrutij01/identifiability-guard
+      name: GitHub Repository
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/identifiability-guard/
+      name: PyPI Package
+  analytics:
+    provider: google
+    property: G-XXXXXXXXXX  # Replace with your GA4 ID
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: installation.md
+      - Quick Start: index.md
+  - User Guide:
+      - Data Generating Processes: dgp.md
+      - Encoder Mixings: encoders.md
+      - Identifiability Metrics: metrics.md
+      - Examples: examples.md
+  - API Reference:
+      - Overview: api/index.md
+      - DGP: api/dgp.md
+      - Encoders: api/encoders.md
+      - Metrics: api/metrics.md
+      - Evaluation: api/evaluation.md
+  - Development:
+      - Contributing: contributing.md

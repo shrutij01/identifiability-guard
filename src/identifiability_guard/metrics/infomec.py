@@ -55,6 +55,7 @@ def _compute_nmi_matrix(
     discrete_latents: bool = False,
     n_neighbors: int = 10,
     num_bins: int = 20,
+    random_state: Optional[int] = None,
 ) -> np.ndarray:
     """
     Compute Normalized Mutual Information matrix between sources and latents.
@@ -108,6 +109,7 @@ def _compute_nmi_matrix(
                     processed_sources[:, i],
                     discrete_features=False,
                     n_neighbors=n_neighbors,
+                    random_state=random_state,
                 )[0]
 
             mi_ij = sanitize_mi(mi_ij)
@@ -121,6 +123,7 @@ def _logistic_regression_entropy(
     y: np.ndarray,
     penalty=None,
     C: float = 1.0,
+    random_state: Optional[int] = None,
 ) -> float:
     """
     Compute conditional entropy H(Y|X) using logistic regression.
@@ -157,6 +160,7 @@ def _logistic_regression_entropy(
     else:
         kwargs["penalty"] = None
 
+    kwargs["random_state"] = random_state
     model = linear_model.LogisticRegression(**kwargs)
 
     try:
@@ -178,6 +182,7 @@ def _compute_infoe(
     sources: np.ndarray,
     latents: np.ndarray,
     discrete_latents: bool = False,
+    random_state: Optional[int] = None,
 ) -> tuple:
     """
     Compute InfoE (Explicitness) score.
@@ -219,7 +224,8 @@ def _compute_infoe(
     for i in range(processed_sources.shape[1]):
         # Conditional entropy H(S_i | Z)
         h_si_given_z = _logistic_regression_entropy(
-            processed_latents, processed_sources[:, i]
+            processed_latents, processed_sources[:, i],
+            random_state=random_state,
         )
 
         # Marginal entropy H(S_i) computed analytically from class frequencies
@@ -266,6 +272,7 @@ def _compute_infomec(
     discrete_latents: bool = False,
     n_neighbors: int = 10,
     compute_infoe: bool = True,
+    random_state: Optional[int] = None,
 ) -> Dict[str, float]:
     """
     Compute all InfoMEC metrics.
@@ -276,12 +283,16 @@ def _compute_infomec(
         discrete_latents: Whether latents are discrete.
         n_neighbors: Number of neighbors for MI estimation.
         compute_infoe: Whether to compute InfoE (expensive). If False, infoe=0.0.
+        random_state: Random seed for reproducibility.
 
     Returns:
         Dictionary with keys 'infom', 'infoe', 'infoc', 'nmi', 'active_latents'.
     """
     # Compute NMI matrix (shape: num_sources x num_latents)
-    nmi = _compute_nmi_matrix(sources, latents, discrete_latents, n_neighbors)
+    nmi = _compute_nmi_matrix(
+        sources, latents, discrete_latents, n_neighbors,
+        random_state=random_state,
+    )
 
     # Determine active latents (with non-trivial range)
     # This follows the original implementation exactly
@@ -301,7 +312,8 @@ def _compute_infomec(
     if pruned_nmi.size == 0 or num_active_latents == 0:
         if compute_infoe:
             infoe_score, infoe_nan_info = _compute_infoe(
-                sources, latents, discrete_latents
+                sources, latents, discrete_latents,
+                random_state=random_state,
             )
         else:
             infoe_score, infoe_nan_info = 0.0, {}
@@ -370,7 +382,8 @@ def _compute_infomec(
     # InfoE: Explicitness - factors should be predictable from codes
     if compute_infoe:
         infoe_score, infoe_nan_info = _compute_infoe(
-            sources, latents, discrete_latents
+            sources, latents, discrete_latents,
+            random_state=random_state,
         )
     else:
         infoe_score, infoe_nan_info = 0.0, {}
@@ -403,15 +416,18 @@ class InfoMECMetric(BaseMetric):
     Args:
         discrete_latents: Whether learned representations are discrete.
         n_neighbors: Number of neighbors for MI estimation (continuous case).
+        random_state: Random seed for reproducibility.
     """
 
     def __init__(
         self,
         discrete_latents: bool = False,
         n_neighbors: int = 10,
+        random_state: Optional[int] = None,
     ):
         self.discrete_latents = discrete_latents
         self.n_neighbors = n_neighbors
+        self.random_state = random_state
 
     @property
     def required_min_samples(self) -> int:
@@ -425,6 +441,7 @@ class InfoMECMetric(BaseMetric):
             latents=Z_hat,
             discrete_latents=self.discrete_latents,
             n_neighbors=self.n_neighbors,
+            random_state=self.random_state,
         )
 
         primary_score = (
@@ -460,9 +477,11 @@ class InfoMMetric(BaseMetric):
         self,
         discrete_latents: bool = False,
         n_neighbors: int = 10,
+        random_state: Optional[int] = None,
     ):
         self.discrete_latents = discrete_latents
         self.n_neighbors = n_neighbors
+        self.random_state = random_state
 
     @property
     def required_min_samples(self) -> int:
@@ -475,6 +494,7 @@ class InfoMMetric(BaseMetric):
             discrete_latents=self.discrete_latents,
             n_neighbors=self.n_neighbors,
             compute_infoe=False,
+            random_state=self.random_state,
         )
         return MetricResult(
             primary_score=float(results["infom"]),
@@ -495,8 +515,10 @@ class InfoEMetric(BaseMetric):
     def __init__(
         self,
         discrete_latents: bool = False,
+        random_state: Optional[int] = None,
     ):
         self.discrete_latents = discrete_latents
+        self.random_state = random_state
 
     @property
     def required_min_samples(self) -> int:
@@ -507,6 +529,7 @@ class InfoEMetric(BaseMetric):
             sources=Z,
             latents=Z_hat,
             discrete_latents=self.discrete_latents,
+            random_state=self.random_state,
         )
         return MetricResult(
             primary_score=float(infoe),
@@ -528,9 +551,11 @@ class InfoCMetric(BaseMetric):
         self,
         discrete_latents: bool = False,
         n_neighbors: int = 10,
+        random_state: Optional[int] = None,
     ):
         self.discrete_latents = discrete_latents
         self.n_neighbors = n_neighbors
+        self.random_state = random_state
 
     @property
     def required_min_samples(self) -> int:
@@ -543,6 +568,7 @@ class InfoCMetric(BaseMetric):
             discrete_latents=self.discrete_latents,
             n_neighbors=self.n_neighbors,
             compute_infoe=False,
+            random_state=self.random_state,
         )
         return MetricResult(
             primary_score=float(results["infoc"]),
