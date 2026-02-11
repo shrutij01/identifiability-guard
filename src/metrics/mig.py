@@ -98,7 +98,11 @@ def _compute_mig(
         # All factors constant → score is undefined, return 0.
         return 0.0, {'zero_entropy_factors': num_zero_entropy}
 
-    per_factor = (sorted_m[0, valid_mask] - sorted_m[1, valid_mask]) / entropy[valid_mask]
+    if sorted_m.shape[0] < 2:
+        # Only one code: gap is the top MI value itself (no second row to subtract).
+        per_factor = sorted_m[0, valid_mask] / entropy[valid_mask]
+    else:
+        per_factor = (sorted_m[0, valid_mask] - sorted_m[1, valid_mask]) / entropy[valid_mask]
     return float(np.mean(per_factor)), {'zero_entropy_factors': num_zero_entropy}
 
 
