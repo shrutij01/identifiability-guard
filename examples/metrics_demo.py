@@ -36,9 +36,9 @@ Available Encoders:
 
 import sys
 import numpy as np
-from src.metrics import MetricRegistry
-from src.dgp import D1Independent, D2Correlated, D3SingleRedundant, D4MultiRedundant
-from src.encoders import (
+from identifiability_guard.metrics import MetricRegistry
+from identifiability_guard.dgp import D1Independent, D2Correlated, D3SingleRedundant, D4MultiRedundant
+from identifiability_guard.encoders import (
     E1ElementwiseLinear,
     E2ElementwiseNonlinear,
     E3LinearlyEntangled,

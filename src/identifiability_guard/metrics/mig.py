@@ -61,6 +61,7 @@ def discrete_entropy(factors: np.ndarray) -> np.ndarray:
 def _compute_mig(
     discretized_mus: np.ndarray,
     ys_train: np.ndarray,
+    single_code_gap_zero: bool = True,
 ) -> tuple:
     """
     Compute MIG score — follows original ``_compute_mig`` from
@@ -100,21 +101,28 @@ def _compute_mig(
         return 0.0, {"zero_entropy_factors": num_zero_entropy}
 
     if sorted_m.shape[0] < 2:
-        # Only one code: gap is the top MI value itself (no second row to subtract).
+        # Only one code dimension: two reasonable conventions exist.
+        # 1) "Gap is zero" (original behavior in this repo): no runner-up to compare.
+        # 2) "Gap equals top MI" (alternative): reward a single code that explains factors.
+        if single_code_gap_zero:
+            warnings.warn(
+                "MIG: only 1 code dimension — gap is trivially 0. "
+                "Set single_code_gap_zero=False to use top-MI convention."
+            )
+            return 0.0, {"zero_entropy_factors": num_zero_entropy}
         per_factor = sorted_m[0, valid_mask] / entropy[valid_mask]
     else:
         per_factor = (
             sorted_m[0, valid_mask] - sorted_m[1, valid_mask]
         ) / entropy[valid_mask]
-    return float(np.mean(per_factor)), {
-        "zero_entropy_factors": num_zero_entropy
-    }
+    return float(np.mean(per_factor)), {"zero_entropy_factors": num_zero_entropy}
 
 
 def _compute_mig_from_samples(
     codes: np.ndarray,
     factors: np.ndarray,
     num_bins: int = 20,
+    single_code_gap_zero: bool = True,
 ) -> tuple:
     """
     Compute the Mutual Information Gap (MIG) score.
@@ -142,7 +150,11 @@ def _compute_mig_from_samples(
     # we add this step so the metric works with continuous factors too.
     discretized_ys = histogram_discretize(ys_train, num_bins)
 
-    return _compute_mig(discretized_mus, discretized_ys)
+    return _compute_mig(
+        discretized_mus,
+        discretized_ys,
+        single_code_gap_zero=single_code_gap_zero,
+    )
 
 
 class MIGMetric(BaseMetric):
@@ -164,12 +176,15 @@ class MIGMetric(BaseMetric):
 
     Args:
         num_bins: Number of bins for discretizing continuous values.
+        single_code_gap_zero: If True (default), a single-code representation
+            yields a MIG gap of 0. If False, uses the top-MI convention.
     """
 
-    def __init__(self, num_bins: int = 20):
+    def __init__(self, num_bins: int = 20, single_code_gap_zero: bool = True):
         if num_bins < 2:
             raise ValueError(f"num_bins must be >= 2, got {num_bins}")
         self.num_bins = num_bins
+        self.single_code_gap_zero = single_code_gap_zero
 
     @property
     def required_min_samples(self) -> int:
@@ -182,6 +197,7 @@ class MIGMetric(BaseMetric):
             codes=Z_hat,
             factors=Z,
             num_bins=self.num_bins,
+            single_code_gap_zero=self.single_code_gap_zero,
         )
         # Clip for the MetricResult interface (original does not clip)
         mig_score = float(np.clip(mig_score, 0.0, 1.0))

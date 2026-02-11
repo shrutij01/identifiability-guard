@@ -120,6 +120,9 @@ def disentanglement_per_code(importance_matrix):
 
 def disentanglement(importance_matrix):
     """Compute the disentanglement score of the representation."""
+    if importance_matrix.shape[1] <= 1:
+        # Only 1 factor → entropy is 0; disentanglement is trivially 1.
+        return np.ones(importance_matrix.shape[0])
     per_code = disentanglement_per_code(importance_matrix)
     if importance_matrix.sum() < EPS:
         importance_matrix = np.ones_like(importance_matrix)
@@ -131,6 +134,9 @@ def disentanglement(importance_matrix):
 def completeness_per_factor(importance_matrix):
     """Compute completeness of each factor."""
     eps = safe_entropy_eps(importance_matrix)
+    if importance_matrix.shape[0] <= 1:
+        # Only 1 code → entropy is 0; completeness is trivially 1.
+        return np.ones(importance_matrix.shape[1])
     raw = 1.0 - scipy.stats.entropy(
         importance_matrix + eps, base=importance_matrix.shape[0], axis=0
     )
