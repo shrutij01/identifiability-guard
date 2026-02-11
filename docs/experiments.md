@@ -1,7 +1,11 @@
 ## Running Experiments
 
 Each experiment is a self-contained script in the `experiments/` directory.
-Run them from the project root:
+Run them from the project root (ensure the package is installed first):
+
+```bash
+pip install -e .
+```
 
 ```bash
 # Run all experiments sequentially
