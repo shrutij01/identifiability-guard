@@ -162,6 +162,47 @@ class MetricRegistry:
 
         return results
 
+    def compute_all_oos(
+        self,
+        Z_train: np.ndarray,
+        Z_hat_train: np.ndarray,
+        Z_test: np.ndarray,
+        Z_hat_test: np.ndarray,
+        metric_names: Optional[List[str]] = None,
+    ) -> Dict[str, MetricResult]:
+        """
+        Compute all registered metrics with out-of-sample evaluation.
+
+        Metrics that override ``compute_oos`` (e.g. R², InfoE) will fit on the
+        training split and evaluate on the test split.  All other metrics fall
+        back to evaluating on the test split only (the ``BaseMetric`` default).
+
+        Args:
+            Z_train: Ground-truth factors for fitting, shape (n_train, d).
+            Z_hat_train: Learned codes for fitting, shape (n_train, m).
+            Z_test: Ground-truth factors for evaluation, shape (n_test, d).
+            Z_hat_test: Learned codes for evaluation, shape (n_test, m).
+            metric_names: Optional list of metric names to compute.
+                        If None, computes all registered metrics.
+
+        Returns:
+            Dictionary mapping metric names to MetricResult objects.
+        """
+        names = metric_names if metric_names is not None else self.list_metrics()
+
+        results = {}
+        for name in names:
+            metric = self.create(name)
+            try:
+                results[name] = metric.compute_oos(
+                    Z_train, Z_hat_train, Z_test, Z_hat_test,
+                )
+            except Exception as e:
+                warnings.warn(f"{name} failed with error: {e}")
+                continue
+
+        return results
+
     def register_defaults(self) -> None:
         """
         Register the default set of metrics.

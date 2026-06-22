@@ -3,6 +3,13 @@ Multi-seed evaluation utilities.
 
 Provides functions to run evaluations over multiple random seeds and
 compute statistics (mean, std, confidence intervals) over the results.
+
+Parallelism
+-----------
+Set ``n_jobs`` > 1 (or -1 for all cores) to run seeds in parallel via
+``joblib.Parallel``.  Reproducibility is preserved because each
+``evaluation_fn(seed)`` is a deterministic pure function of the seed, and
+results are collected in seed-order (not completion-order).
 """
 
 from typing import Callable, Dict, List, Optional, Any, Tuple
@@ -10,22 +17,38 @@ import numpy as np
 from scipy import stats
 
 
+# ---------------------------------------------------------------------------
+# Helpers for parallel execution
+# ---------------------------------------------------------------------------
+
+def _safe_evaluate(evaluation_fn, seed):
+    """Top-level wrapper so joblib can pickle it via cloudpickle."""
+    try:
+        return evaluation_fn(seed)
+    except Exception as e:
+        return e  # return exception object; caller converts to NaN
+
+
 def run_with_seeds(
     evaluation_fn: Callable[[int], Dict[str, float]],
     seeds: List[int],
     verbose: bool = True,
+    n_jobs: int = 1,
 ) -> Dict[str, List[float]]:
     """
     Run evaluation function with multiple seeds and collect results.
-    
+
     Args:
         evaluation_fn: Function that takes a seed and returns a dict of metrics.
         seeds: List of random seeds to use.
         verbose: If True, prints progress.
-        
+        n_jobs: Number of parallel workers.  1 = sequential (default),
+                -1 = all available cores.  Requires ``joblib``.
+
     Returns:
         Dictionary mapping metric names to lists of values (one per seed).
-        
+        Results are always in seed-order regardless of ``n_jobs``.
+
     Example:
         >>> def eval_fn(seed):
         ...     dgp = D1Independent(d=5, seed=seed)
@@ -35,22 +58,27 @@ def run_with_seeds(
         ...     return {"mcc": compute_mcc(Z, Z_hat)}
         >>> results = run_with_seeds(eval_fn, seeds=[42, 43, 44])
     """
-    # Initialize results dict
+    if n_jobs != 1:
+        return _run_with_seeds_parallel(
+            evaluation_fn, seeds, verbose=verbose, n_jobs=n_jobs,
+        )
+
+    # --- Sequential (original path) ---
     all_results: Dict[str, List[float]] = {}
-    
+
     for i, seed in enumerate(seeds):
         if verbose:
             print(f"Running with seed {seed} ({i+1}/{len(seeds)})...")
-        
+
         try:
             result = evaluation_fn(seed)
-            
+
             # Add results to collection
             for metric_name, value in result.items():
                 if metric_name not in all_results:
                     all_results[metric_name] = []
                 all_results[metric_name].append(value)
-        
+
         except Exception as e:
             if verbose:
                 print(f"  Warning: Evaluation failed for seed {seed}: {e}")
@@ -58,7 +86,46 @@ def run_with_seeds(
             if all_results:
                 for metric_name in all_results.keys():
                     all_results[metric_name].append(np.nan)
-    
+
+    return all_results
+
+
+def _run_with_seeds_parallel(
+    evaluation_fn: Callable[[int], Dict[str, float]],
+    seeds: List[int],
+    verbose: bool = True,
+    n_jobs: int = -1,
+) -> Dict[str, List[float]]:
+    """Parallel variant of :func:`run_with_seeds` using joblib."""
+    from joblib import Parallel, delayed  # lazy import; always available via sklearn
+
+    if verbose:
+        print(f"Running {len(seeds)} seeds in parallel (n_jobs={n_jobs}) ...")
+
+    # joblib.Parallel preserves input order in the returned list.
+    ordered_results = Parallel(n_jobs=n_jobs, verbose=0)(
+        delayed(_safe_evaluate)(evaluation_fn, seed) for seed in seeds
+    )
+
+    # Reassemble into {metric: [val_per_seed]} dict, in seed-order.
+    all_results: Dict[str, List[float]] = {}
+    for i, result in enumerate(ordered_results):
+        if isinstance(result, Exception):
+            if verbose:
+                print(f"  Warning: seed {seeds[i]} failed: {result}")
+            # Append NaN for every metric already seen
+            for metric_name in all_results:
+                all_results[metric_name].append(np.nan)
+        else:
+            for metric_name, value in result.items():
+                if metric_name not in all_results:
+                    all_results[metric_name] = []
+                all_results[metric_name].append(value)
+
+    if verbose:
+        n_ok = sum(1 for r in ordered_results if not isinstance(r, Exception))
+        print(f"  Completed: {n_ok}/{len(seeds)} seeds succeeded.")
+
     return all_results
 
 
@@ -163,22 +230,25 @@ def run_multi_seed_evaluation(
     base_seed: int = 42,
     confidence_level: float = 0.95,
     verbose: bool = True,
+    n_jobs: int = 1,
 ) -> Tuple[Dict[str, List[float]], Dict[str, Dict[str, float]]]:
     """
     Run evaluation over multiple seeds and return raw and aggregated results.
-    
+
     Args:
         evaluation_fn: Function that takes a seed and returns a dict of metrics.
         n_seeds: Number of seeds to use.
         base_seed: Starting seed value.
         confidence_level: Confidence level for confidence intervals.
         verbose: If True, prints progress and summary.
-        
+        n_jobs: Number of parallel workers.  1 = sequential (default),
+                -1 = all available cores.
+
     Returns:
         Tuple of (raw_results, aggregated_results).
         raw_results: Dict mapping metric names to lists of values.
         aggregated_results: Dict mapping metric names to statistics dicts.
-        
+
     Example:
         >>> def eval_fn(seed):
         ...     # ... evaluation code ...
@@ -188,14 +258,16 @@ def run_multi_seed_evaluation(
     """
     # Generate seeds
     seeds = [base_seed + i for i in range(n_seeds)]
-    
+
     if verbose:
         print(f"Running evaluation with {n_seeds} seeds...")
         print(f"Seeds: {seeds}")
-    
+
     # Run evaluations
-    raw_results = run_with_seeds(evaluation_fn, seeds, verbose=verbose)
-    
+    raw_results = run_with_seeds(
+        evaluation_fn, seeds, verbose=verbose, n_jobs=n_jobs,
+    )
+
     # Compute statistics
     aggregated_results = aggregate_results(raw_results, confidence_level)
     

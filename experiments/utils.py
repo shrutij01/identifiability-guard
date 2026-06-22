@@ -20,6 +20,8 @@ from identifiability_guard.evaluation import (
     DGP_CLASSES,
     ENCODER_CLASSES,
     ALL_METRICS,
+    MAIN_METRICS,
+    APX_METRICS,
     DEFAULT_METRICS,
     METRIC_DISPLAY_NAMES,
     create_dgp_with_params,
@@ -32,7 +34,7 @@ from identifiability_guard.evaluation.multi_seed import run_multi_seed_evaluatio
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_N_SAMPLES = 100
+DEFAULT_N_SAMPLES = 1000
 DEFAULT_N_FACTORS = 5
 DEFAULT_N_SEEDS = 5
 DEFAULT_BASE_SEED = 42
@@ -41,8 +43,6 @@ RESULTS_DIR = Path(__file__).resolve().parent / "runs"
 # Colour palette – one colour per metric for consistency across all plots.
 METRIC_COLORS = {
     "dci_disentanglement": "#1f77b4",
-    "dci_completeness": "#ff7f0e",
-    "dci_informativeness": "#2ca02c",
     "mcc_pearson": "#d62728",
     "mcc_spearman": "#9467bd",
     "mcc_rdc": "#8c564b",
@@ -50,15 +50,11 @@ METRIC_COLORS = {
     "mig": "#7f7f7f",
     "tmex": "#bcbd22",
     "infom": "#17becf",
-    "infoe": "#aec7e8",
-    "infoc": "#ffbb78",
 }
 
 # Marker cycle
 METRIC_MARKERS = {
     "dci_disentanglement": "o",
-    "dci_completeness": "s",
-    "dci_informativeness": "^",
     "mcc_pearson": "D",
     "mcc_spearman": "v",
     "mcc_rdc": "P",
@@ -66,9 +62,15 @@ METRIC_MARKERS = {
     "mig": "X",
     "tmex": "h",
     "infom": "p",
-    "infoe": "<",
-    "infoc": ">",
 }
+
+# Theory overlay styling
+THEORY_COLOR = "#888888"
+THEORY_LINESTYLE = "--"
+
+# Colours and markers for d-value curves (collapse plots)
+D_COLORS = {3: "#1b9e77", 5: "#d95f02", 10: "#7570b3", 20: "#e7298a"}
+D_MARKERS = {3: "o", 5: "s", 10: "^", 20: "D"}
 
 # ---------------------------------------------------------------------------
 # Plot styling
@@ -77,18 +79,20 @@ METRIC_MARKERS = {
 def setup_plot_style():
     """Set up matplotlib style for publication-quality plots."""
     mpl.rcParams.update({
-        "font.size": 11,
-        "axes.labelsize": 12,
-        "axes.titlesize": 13,
-        "xtick.labelsize": 10,
-        "ytick.labelsize": 10,
-        "legend.fontsize": 9,
-        "figure.titlesize": 14,
-        "lines.linewidth": 2,
-        "lines.markersize": 6,
+        "font.size": 14,
+        "axes.labelsize": 16,
+        "axes.titlesize": 18,
+        "xtick.labelsize": 13,
+        "ytick.labelsize": 13,
+        "legend.fontsize": 12,
+        "figure.titlesize": 18,
+        "lines.linewidth": 2.5,
+        "lines.markersize": 7,
         "figure.dpi": 150,
         "savefig.dpi": 300,
         "savefig.bbox": "tight",
+        "mathtext.fontset": "stix",
+        "font.family": "STIXGeneral",
     })
 
 
@@ -125,9 +129,14 @@ def evaluate_dgp_encoder(
     encoder_kwargs: Optional[Dict[str, Any]] = None,
     metrics_to_compute: Optional[Set[str]] = None,
     registry: Optional[MetricRegistry] = None,
+    train_fraction: float = 0.8,
 ) -> Dict[str, float]:
     """
     Evaluate all requested metrics for a single DGP × Encoder combination.
+
+    Data is split into train/test (controlled by *train_fraction*).  Metrics
+    that fit a model (R², InfoE) are trained on the train split and scored on
+    held-out test data.  Pure-statistic metrics evaluate on the test split.
 
     Parameters
     ----------
@@ -144,6 +153,8 @@ def evaluate_dgp_encoder(
         Subset of ``ALL_METRICS`` keys.  ``None`` → all.
     registry : MetricRegistry, optional
         Reuse an existing registry instance.
+    train_fraction : float
+        Fraction of samples used for training (default 0.8).
 
     Returns
     -------
@@ -165,10 +176,36 @@ def evaluate_dgp_encoder(
     dgp = create_dgp_with_params(dgp_name, n_factors, seed, params)
     Z = dgp.sample(n_samples)
 
-    encoder = create_encoder_with_params(encoder_name, n_factors, seed, params)
+    # Use a distinct seed for the encoder to prevent seed coupling.
+    # With the same seed, null encoders like E9 (Gaussian) produce Z_hat == Z
+    # because both RNGs start from the same state and call equivalent functions.
+    encoder_seed = seed + 1_000_000
+    encoder = create_encoder_with_params(encoder_name, n_factors, encoder_seed, params)
     Z_hat = encoder.encode(Z)
 
-    all_results = registry.compute_all(Z, Z_hat)
+    # Train/test split
+    n_train = int(n_samples * train_fraction)
+    rng = np.random.RandomState(seed)
+    idx = rng.permutation(n_samples)
+    train_idx, test_idx = idx[:n_train], idx[n_train:]
+
+    Z_train, Z_hat_train = Z[train_idx], Z_hat[train_idx]
+    Z_test, Z_hat_test = Z[test_idx], Z_hat[test_idx]
+
+    # Map user-facing metric names to registry-level names so we only
+    # compute what's actually needed (e.g. dci_disentanglement → dci).
+    _METRIC_TO_REGISTRY = {
+        'dci_disentanglement': 'dci', 'dci_completeness': 'dci',
+        'dci_informativeness': 'dci',
+    }
+    registry_names = list({
+        _METRIC_TO_REGISTRY.get(m, m) for m in metrics_to_compute
+    })
+
+    all_results = registry.compute_all_oos(
+        Z_train, Z_hat_train, Z_test, Z_hat_test,
+        metric_names=registry_names,
+    )
     return extract_metric_scores(all_results, metrics_to_compute)
 
 
@@ -177,13 +214,26 @@ def evaluate_with_arrays(
     Z_hat: np.ndarray,
     metrics_to_compute: Optional[Set[str]] = None,
     registry: Optional[MetricRegistry] = None,
+    Z_train: Optional[np.ndarray] = None,
+    Z_hat_train: Optional[np.ndarray] = None,
 ) -> Dict[str, float]:
-    """Compute metrics given pre-built arrays."""
+    """Compute metrics given pre-built arrays.
+
+    When *Z_train* and *Z_hat_train* are provided, model-based metrics fit on
+    those arrays and evaluate on (Z, Z_hat) as the held-out test set.
+    Otherwise all metrics evaluate on (Z, Z_hat) only (original behaviour).
+    """
     if metrics_to_compute is None:
         metrics_to_compute = set(ALL_METRICS.keys())
     if registry is None:
         registry = make_registry()
-    all_results = registry.compute_all(Z, Z_hat)
+
+    if Z_train is not None and Z_hat_train is not None:
+        all_results = registry.compute_all_oos(
+            Z_train, Z_hat_train, Z, Z_hat,
+        )
+    else:
+        all_results = registry.compute_all(Z, Z_hat)
     return extract_metric_scores(all_results, metrics_to_compute)
 
 
@@ -191,10 +241,19 @@ def multi_seed_evaluate(
     eval_one_seed: Callable[[int], Dict[str, float]],
     n_seeds: int = DEFAULT_N_SEEDS,
     base_seed: int = DEFAULT_BASE_SEED,
+    n_jobs: int = 1,
 ) -> Tuple[Dict[str, List[float]], Dict[str, Dict[str, float]]]:
-    """Convenience wrapper around ``run_multi_seed_evaluation``."""
+    """Convenience wrapper around ``run_multi_seed_evaluation``.
+
+    Parameters
+    ----------
+    n_jobs : int
+        Number of parallel workers for the seed loop.  ``1`` = sequential
+        (default), ``-1`` = all available cores.
+    """
     return run_multi_seed_evaluation(
         eval_one_seed, n_seeds=n_seeds, base_seed=base_seed, verbose=False,
+        n_jobs=n_jobs,
     )
 
 
@@ -282,7 +341,7 @@ def plot_metrics_vs_xaxis_with_ci(
         c = get_color(m)
         ax.plot(x_values, means[m], marker=get_marker(m), color=c,
                 label=display_name(m))
-        ax.fill_between(x_values, ci_lo[m], ci_hi[m], color=c, alpha=0.15)
+        ax.fill_between(x_values, ci_lo[m], ci_hi[m], color=c, alpha=0.25)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
@@ -290,6 +349,176 @@ def plot_metrics_vs_xaxis_with_ci(
         ax.set_ylim(ylim)
     ax.legend(loc="best", ncol=2, fontsize=8)
     ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    return fig
+
+
+def plot_sweep_split(
+    x_values: List[Any],
+    means: Dict[str, List[float]],
+    ci_lo: Dict[str, List[float]],
+    ci_hi: Dict[str, List[float]],
+    invariant_metrics: List[str],
+    varying_metrics: List[str],
+    xlabel: str,
+    title_left: str = "Invariant metrics",
+    title_right: str = "Varying metrics",
+    ylabel: str = "Metric score",
+    figsize: Tuple[float, float] = (12, 5),
+    xscale: Optional[str] = None,
+    xscale_kwargs: Optional[Dict[str, Any]] = None,
+    ref_lines: Optional[List[Tuple[str, float, str]]] = None,
+    theory_lines: Optional[Dict[str, Tuple[List, List, str]]] = None,
+    ylim: Optional[Tuple[float, float]] = (-0.05, 1.05),
+) -> plt.Figure:
+    """1x2 split sweep: left panel shows stable metrics, right panel shows varying ones.
+
+    Parameters
+    ----------
+    invariant_metrics : list of str
+        Metrics expected to stay constant (plotted on left panel).
+    varying_metrics : list of str
+        Metrics expected to vary (plotted on right panel).
+    ref_lines : list of (orientation, value, label), optional
+        ``'v'`` for axvline, ``'h'`` for axhline.
+    theory_lines : dict mapping metric_name -> (x_vals, y_vals, label), optional
+        Dashed theory overlays on both panels.
+    """
+    setup_plot_style()
+    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=figsize, sharey=True)
+
+    for ax, metric_list, title in [
+        (ax_left, invariant_metrics, title_left),
+        (ax_right, varying_metrics, title_right),
+    ]:
+        for m in metric_list:
+            if m not in means:
+                continue
+            c = get_color(m)
+            ax.plot(x_values, means[m], marker=get_marker(m), color=c,
+                    label=display_name(m), markersize=5)
+            ax.fill_between(x_values, ci_lo[m], ci_hi[m], color=c, alpha=0.25)
+            # Theory overlay for this metric
+            if theory_lines and m in theory_lines:
+                tx, ty, tlabel = theory_lines[m]
+                ax.plot(tx, ty, color=THEORY_COLOR, linestyle=THEORY_LINESTYLE,
+                        lw=1.5, label=tlabel)
+        if xscale:
+            kw = xscale_kwargs or {}
+            ax.set_xscale(xscale, **kw)
+        ax.set_xlabel(xlabel)
+        ax.set_title(title)
+        ax.grid(True, alpha=0.3)
+        if ylim is not None:
+            ax.set_ylim(ylim)
+        # Reference lines
+        if ref_lines:
+            for orient, val, lab in ref_lines:
+                if orient == "v":
+                    ax.axvline(val, color="grey", ls="--", lw=0.8, label=lab)
+                else:
+                    ax.axhline(val, color="grey", ls="--", lw=0.8, label=lab)
+
+    ax_left.set_ylabel(ylabel)
+    # Unified legend below both panels
+    handles, labels = [], []
+    for ax in (ax_left, ax_right):
+        h, l = ax.get_legend_handles_labels()
+        for hi, li in zip(h, l):
+            if li not in labels:
+                handles.append(hi)
+                labels.append(li)
+    fig.legend(handles, labels, loc="lower center", ncol=min(6, len(labels)),
+               fontsize=8, bbox_to_anchor=(0.5, -0.06))
+    fig.tight_layout()
+    return fig
+
+
+def plot_collapse(
+    metric_name: str,
+    curves: List[Tuple],
+    xlabel: str,
+    ax: Optional[plt.Axes] = None,
+    title: Optional[str] = None,
+    xscale: Optional[str] = None,
+    xscale_kwargs: Optional[Dict[str, Any]] = None,
+    theory_line: Optional[Tuple] = None,
+    ylim: Optional[Tuple[float, float]] = (-0.05, 1.05),
+) -> plt.Axes:
+    """Plot multiple overlaid curves for a single metric on one axes.
+
+    Parameters
+    ----------
+    curves : list of (x_vals, means, ci_lo, ci_hi, label, color, marker)
+    theory_line : (x_vals, y_vals, label), optional
+    """
+    if ax is None:
+        _, ax = plt.subplots()
+    for x_vals, m_vals, lo, hi, label, color, marker in curves:
+        ax.plot(x_vals, m_vals, marker=marker, color=color, label=label,
+                markersize=6)
+        ax.fill_between(x_vals, lo, hi, color=color, alpha=0.12)
+    if theory_line:
+        tx, ty, tlabel = theory_line
+        ax.plot(tx, ty, color=THEORY_COLOR, linestyle=THEORY_LINESTYLE,
+                lw=1.5, label=tlabel)
+    if xscale:
+        kw = xscale_kwargs or {}
+        ax.set_xscale(xscale, **kw)
+    ax.set_xlabel(xlabel)
+    if title is None:
+        title = display_name(metric_name)
+    ax.set_title(title, fontsize=11)
+    ax.grid(True, alpha=0.3)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+    return ax
+
+
+def plot_collapse_grid(
+    metrics: List[str],
+    curves_per_metric: Dict[str, List[Tuple]],
+    xlabel: str,
+    suptitle: str,
+    ncols: int = 4,
+    xscale: Optional[str] = None,
+    xscale_kwargs: Optional[Dict[str, Any]] = None,
+    theory_lines: Optional[Dict[str, Tuple]] = None,
+    ylim: Optional[Tuple[float, float]] = (-0.05, 1.05),
+    figsize_per_cell: Tuple[float, float] = (5, 4),
+) -> plt.Figure:
+    """Grid of collapse plots — one panel per metric, multiple curves per panel.
+
+    Parameters
+    ----------
+    curves_per_metric : dict mapping metric_name -> list of curve tuples
+        Each curve: (x_vals, means, ci_lo, ci_hi, label, color, marker)
+    theory_lines : dict mapping metric_name -> (x_vals, y_vals, label), optional
+    """
+    setup_plot_style()
+    n_metrics = len(metrics)
+    nrows = (n_metrics + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols,
+                             figsize=(figsize_per_cell[0] * ncols,
+                                      figsize_per_cell[1] * nrows),
+                             sharey=True)
+    axes_flat = np.array(axes).flatten()
+
+    for idx, met in enumerate(metrics):
+        ax = axes_flat[idx]
+        theory = theory_lines.get(met) if theory_lines else None
+        curves = curves_per_metric.get(met, [])
+        plot_collapse(met, curves, xlabel, ax=ax, xscale=xscale,
+                      xscale_kwargs=xscale_kwargs, theory_line=theory,
+                      ylim=ylim)
+        if idx == 0:
+            ax.legend(fontsize=7, loc="best")
+
+    for idx in range(n_metrics, len(axes_flat)):
+        axes_flat[idx].set_visible(False)
+
+    axes_flat[0].set_ylabel("Metric score")
+    fig.suptitle(suptitle, y=1.02, fontsize=13)
     fig.tight_layout()
     return fig
 
@@ -304,11 +533,31 @@ def plot_heatmap(
     cmap: str = "RdYlGn",
     vmin: Optional[float] = None,
     vmax: Optional[float] = None,
+    center: Optional[float] = None,
     figsize: Optional[Tuple[float, float]] = None,
     fmt: str = ".2f",
 ) -> plt.Figure:
-    """Generic annotated heatmap."""
+    """Generic annotated heatmap.
+
+    Parameters
+    ----------
+    center : float, optional
+        When provided, use a diverging colormap centered on this value.
+        ``vmin`` and ``vmax`` are set symmetrically around *center* if not
+        already specified.  The default *cmap* switches to ``'RdYlGn'``
+        (green = center = correct, red = far from center = broken).
+    """
     setup_plot_style()
+    if center is not None:
+        finite = data[np.isfinite(data)]
+        if len(finite) > 0:
+            max_dev = max(abs(finite.max() - center), abs(finite.min() - center))
+        else:
+            max_dev = 1.0
+        if vmin is None:
+            vmin = center - max_dev
+        if vmax is None:
+            vmax = center + max_dev
     if figsize is None:
         figsize = (max(6, len(col_labels) * 0.9), max(4, len(row_labels) * 0.6))
     fig, ax = plt.subplots(figsize=figsize)
