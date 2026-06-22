@@ -22,19 +22,20 @@ import numpy as np
 # ---------------------------------------------------------------------------
 
 DEFAULT_STYLE = {
-    "font.size": 12,
-    "axes.titlesize": 16,
-    "axes.labelsize": 13,
-    "xtick.labelsize": 11,
-    "ytick.labelsize": 11,
-    "legend.fontsize": 11,
-    "figure.titlesize": 16,
+    "font.size": 14,
+    "axes.titlesize": 18,
+    "axes.labelsize": 16,
+    "xtick.labelsize": 13,
+    "ytick.labelsize": 13,
+    "legend.fontsize": 12,
+    "figure.titlesize": 18,
     "lines.linewidth": 2.5,
     "lines.markersize": 7,
     "axes.linewidth": 1.2,
     "grid.linewidth": 0.8,
     "mathtext.fontset": "stix",
     "font.family": "STIXGeneral",
+    "text.usetex": False,
 }
 
 
@@ -45,17 +46,20 @@ def set_pretty_style(overrides: Optional[Dict[str, float]] = None) -> None:
         mpl.rcParams.update(overrides)
 
 
-def _mathify(text: str) -> str:
+def _mathify(text: str, bold: bool = False) -> str:
+    """Wrap plain text in mathtext; leave text already containing ``$`` as-is."""
     if text is None:
         return text
     if "$" in text:
         return text
+    if bold:
+        return rf"$\mathbf{{{text}}}$"
     return f"${text}$"
 
 
 def apply_math_ticks(ax: plt.Axes, axis: str = "both") -> None:
-    """Format numeric tick labels using mathtext."""
-    fmt = FuncFormatter(lambda x, pos: rf"${x:g}$")
+    """Format numeric tick labels as boldface mathtext."""
+    fmt = FuncFormatter(lambda x, pos: rf"$\mathbf{{{x:g}}}$")
     if axis in ("both", "x"):
         ax.xaxis.set_major_formatter(fmt)
     if axis in ("both", "y"):
@@ -68,14 +72,15 @@ def apply_axis_labels(
     xlabel: Optional[str] = None,
     ylabel: Optional[str] = None,
     math: bool = False,
+    fontweight: str = "bold",
 ) -> None:
-    """Set axis labels with optional mathtext wrapping."""
+    """Set axis labels with optional mathtext wrapping and bold weight."""
     if title is not None:
-        ax.set_title(_mathify(title) if math else title)
+        ax.set_title(_mathify(title) if math else title, fontweight=fontweight)
     if xlabel is not None:
-        ax.set_xlabel(_mathify(xlabel) if math else xlabel)
+        ax.set_xlabel(_mathify(xlabel) if math else xlabel, fontweight=fontweight)
     if ylabel is not None:
-        ax.set_ylabel(_mathify(ylabel) if math else ylabel)
+        ax.set_ylabel(_mathify(ylabel) if math else ylabel, fontweight=fontweight)
 
 
 def _maybe_mathify_labels(labels: Sequence[str], math: bool) -> List[str]:
@@ -171,7 +176,7 @@ def plot_lines(
                 y - err,
                 y + err,
                 color=color,
-                alpha=0.2,
+                alpha=0.25,
                 linewidth=0,
             )
     if math_ticks:
@@ -249,14 +254,16 @@ def plot_heatmap(
     if annotate:
         for i in range(data.shape[0]):
             for j in range(data.shape[1]):
+                val = data[i, j]
+                txt = rf"$\mathbf{{{format(val, fmt)}}}$" if np.isfinite(val) else "—"
                 ax.text(
                     j,
                     i,
-                    format(data[i, j], fmt),
+                    txt,
                     ha="center",
                     va="center",
                     fontsize=10,
-                    color="white" if data[i, j] > np.nanmean(data) else "black",
+                    color="white" if val > np.nanmean(data) else "black",
                 )
 
     if cbar:

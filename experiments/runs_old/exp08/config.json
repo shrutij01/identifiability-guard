@@ -1,0 +1,17 @@
+{
+  "dgps": [
+    "D1",
+    "D2",
+    "D3",
+    "D4"
+  ],
+  "encoders": [
+    "E1",
+    "E5",
+    "E6",
+    "E8"
+  ],
+  "n_samples": 100,
+  "n_factors": 5,
+  "n_seeds": 5
+}

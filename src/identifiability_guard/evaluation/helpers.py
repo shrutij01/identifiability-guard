@@ -85,21 +85,28 @@ METRIC_DISPLAY_NAMES = {
     'infoc': 'InfoC',
 }
 
-# Default subset of metrics to track (for faster evaluation)
-DEFAULT_METRICS = {
-    'dci_disentanglement', 
-    'dci_completeness', 
-    'dci_informativeness', 
+# Main paper metrics (disentanglement-focused)
+MAIN_METRICS = {
+    'mcc_pearson',
+    'mcc_spearman',
+    'r2',
+    'dci_disentanglement',
+}
+
+# Appendix metrics (all disentanglement metrics)
+APX_METRICS = {
     'mcc_pearson',
     'mcc_spearman',
     'mcc_rdc',
     'r2',
-    'mig',
-    'tmex',
+    'dci_disentanglement',
     'infom',
-    'infoe',
-    'infoc',
+    'tmex',
+    'mig',
 }
+
+# Backwards-compatible alias
+DEFAULT_METRICS = APX_METRICS
 
 
 def get_dgp_class(name: str):

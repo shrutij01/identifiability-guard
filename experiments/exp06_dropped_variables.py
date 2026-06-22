@@ -26,7 +26,7 @@ from utils import (
     make_registry,
     get_color, get_marker, display_name,
     DEFAULT_N_SAMPLES, DEFAULT_N_SEEDS, DEFAULT_BASE_SEED,
-    ALL_METRICS,
+    MAIN_METRICS, APX_METRICS,
     RESULTS_DIR,
 )
 from sensitivity import sweep_factors
@@ -37,7 +37,8 @@ D_TOTAL = 10          # total ground-truth factors
 N_SAMPLES = DEFAULT_N_SAMPLES
 N_SEEDS = DEFAULT_N_SEEDS
 BASE_SEED = DEFAULT_BASE_SEED
-METRICS = sorted(ALL_METRICS.keys())
+METRICS = sorted(APX_METRICS)
+METRICS_MAIN = sorted(MAIN_METRICS)
 
 
 # ── Experiment 6a: sweep m (number of retained factors) ────────────────────
@@ -83,23 +84,44 @@ def sweep_dropped_variables(dgp_name: str, d_total=D_TOTAL):
     return m_values, means, ci_lo, ci_hi
 
 
-def plot_dropped_variables_single(dgp_name, m_values, means, ci_lo, ci_hi):
-    """Single-panel figure for one DGP."""
+def plot_dropped_variables_single(dgp_name, m_values, means, ci_lo, ci_hi,
+                                   metrics=None, use_ratio=False):
+    """Single-panel figure for one DGP.
+
+    Parameters
+    ----------
+    use_ratio : bool
+        When True, x-axis shows m/d instead of raw m.
+    """
+    if use_ratio:
+        x_values = [m / D_TOTAL for m in m_values]
+        xlabel = r"$m\,/\,d$"
+        title = f"Effect of dropping variables ({dgp_name} + E4, d={D_TOTAL})"
+    else:
+        x_values = m_values
+        xlabel = "Number of retained factors m"
+        title = f"Effect of dropping variables ({dgp_name} + E4, d={D_TOTAL})"
     fig = plot_metrics_vs_xaxis_with_ci(
-        m_values, means, ci_lo, ci_hi,
-        xlabel="Number of retained factors m",
-        title=f"Effect of dropping variables ({dgp_name} + E4, d={D_TOTAL})",
+        x_values, means, ci_lo, ci_hi,
+        xlabel=xlabel,
+        title=title,
+        metrics_to_plot=metrics,
     )
     ax = fig.axes[0]
-    ax.axvline(D_TOTAL, color="grey", ls="--", lw=1.0, label="d = m")
-    # Extend xlim so the d=m vertical line is clearly visible
-    ax.set_xlim(min(m_values) - 0.5, max(m_values) + 0.5)
+    if use_ratio:
+        ax.axvline(1.0, color="grey", ls="--", lw=1.0, label="m/d = 1")
+        ax.set_xlim(-0.02, 1.05)
+    else:
+        ax.axvline(D_TOTAL, color="grey", ls="--", lw=1.0, label="d = m")
+        ax.set_xlim(min(m_values) - 0.5, max(m_values) + 0.5)
     ax.legend(loc="best", ncol=2, fontsize=8)
     return fig
 
 
-def plot_dropped_variables_all_dgps(all_results):
+def plot_dropped_variables_all_dgps(all_results, metrics=None):
     """Multi-panel: one panel per DGP."""
+    if metrics is None:
+        metrics = METRICS
     setup_plot_style()
     n_dgps = len(all_results)
     fig, axes = plt.subplots(1, n_dgps, figsize=(6 * n_dgps, 5), sharey=True)
@@ -107,11 +129,11 @@ def plot_dropped_variables_all_dgps(all_results):
         axes = [axes]
 
     for ax, (dgp_name, (m_vals, means, ci_lo, ci_hi)) in zip(axes, all_results.items()):
-        for met in METRICS:
+        for met in metrics:
             c = get_color(met)
             ax.plot(m_vals, means[met], marker=get_marker(met), color=c,
                     label=display_name(met), markersize=4)
-            ax.fill_between(m_vals, ci_lo[met], ci_hi[met], color=c, alpha=0.12)
+            ax.fill_between(m_vals, ci_lo[met], ci_hi[met], color=c, alpha=0.25)
         # Mark d = m point
         ax.axvline(D_TOTAL, color="grey", ls="--", lw=1.0, label="d = m")
         ax.set_xlabel("Retained factors m")
@@ -173,12 +195,13 @@ def sweep_total_factors(dgp_name: str, m_fixed: int = 3):
     return d_values, means, ci_lo, ci_hi
 
 
-def plot_inflated_dimensions(dgp_name, d_values, means, ci_lo, ci_hi, m_fixed):
+def plot_inflated_dimensions(dgp_name, d_values, means, ci_lo, ci_hi, m_fixed, metrics=None):
     fig = plot_metrics_vs_xaxis_with_ci(
         d_values, means, ci_lo, ci_hi,
         xlabel="Total ground-truth factors d",
         title=f"Metric inflation with extra dimensions\n"
               f"({dgp_name} + E4, m={m_fixed} fixed)",
+        metrics_to_plot=metrics,
     )
     ax = fig.axes[0]
     ax.axvline(m_fixed, color="grey", ls="--", lw=1.0, label="d = m")
@@ -190,62 +213,128 @@ def plot_inflated_dimensions(dgp_name, d_values, means, ci_lo, ci_hi, m_fixed):
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
-def main():
+def main(plot_only=False, quick=False):
+    from results_io import save_results, load_results
+
     print("=" * 70)
     print("Experiment 6 – Dropped variables & dimension inflation")
     print("=" * 70)
 
-    # 6a: sweep m
-    all_results_m = {}
-    for dgp in DGPS:
-        print(f"  DGP: {dgp}")
-        m_vals, means, ci_lo, ci_hi = sweep_dropped_variables(dgp)
-        all_results_m[dgp] = (m_vals, means, ci_lo, ci_hi)
-        fig = plot_dropped_variables_single(dgp, m_vals, means, ci_lo, ci_hi)
-        savefig(fig, f"exp06a_dropped_{dgp}.pdf", subdir="exp06")
-        savefig(
-            plot_dropped_variables_single(dgp, m_vals, means, ci_lo, ci_hi),
-            f"exp06a_dropped_{dgp}.png", subdir="exp06",
-        )
+    m_fixed = 3
 
-    fig_all = plot_dropped_variables_all_dgps(all_results_m)
-    savefig(fig_all, "exp06a_dropped_all_dgps.pdf", subdir="exp06")
-    savefig(
-        plot_dropped_variables_all_dgps(all_results_m),
-        "exp06a_dropped_all_dgps.png", subdir="exp06",
-    )
+    if plot_only:
+        data, config = load_results("exp06")
+        # Reconstruct 6a results
+        all_results_m = {}
+        for dgp in config["dgps"]:
+            d = data["6a"][dgp]
+            m_vals = config["m_values_6a"]
+            all_results_m[dgp] = (m_vals, d["means"], d["ci_lo"], d["ci_hi"])
+    else:
+        # 6a: sweep m
+        all_results_m = {}
+        save_6a = {}
+        m_vals = None
+        for dgp in DGPS:
+            print(f"  DGP: {dgp}")
+            m_vals_dgp, means, ci_lo, ci_hi = sweep_dropped_variables(dgp)
+            all_results_m[dgp] = (m_vals_dgp, means, ci_lo, ci_hi)
+            save_6a[dgp] = {"means": means, "ci_lo": ci_lo, "ci_hi": ci_hi}
+            if m_vals is None:
+                m_vals = m_vals_dgp
+
+    # Plot 6a
+    for dgp in (config["dgps"] if plot_only else DGPS):
+        m_vals_dgp, means, ci_lo, ci_hi = all_results_m[dgp]
+        tags = [("main", METRICS_MAIN)] if quick else [("main", METRICS_MAIN), ("apx", METRICS)]
+        for tag, mets in tags:
+            for ext in ("pdf", "png"):
+                fig = plot_dropped_variables_single(dgp, m_vals_dgp, means, ci_lo, ci_hi, metrics=mets)
+                savefig(fig, f"exp06a_dropped_{dgp}_{tag}.{ext}", subdir="exp06")
+
+    tags = [("main", METRICS_MAIN)] if quick else [("main", METRICS_MAIN), ("apx", METRICS)]
+    for tag, mets in tags:
+        for ext in ("pdf", "png"):
+            fig = plot_dropped_variables_all_dgps(all_results_m, metrics=mets)
+            savefig(fig, f"exp06a_dropped_all_dgps_{tag}.{ext}", subdir="exp06")
+
+    # Main-text: D1 only, m/d ratio x-axis
+    dgp_main = "D1"
+    if dgp_main in all_results_m:
+        m_vals_d1, means_d1, ci_lo_d1, ci_hi_d1 = all_results_m[dgp_main]
+        for ext in ("pdf", "png"):
+            fig = plot_dropped_variables_single(
+                dgp_main, m_vals_d1, means_d1, ci_lo_d1, ci_hi_d1,
+                metrics=METRICS_MAIN, use_ratio=True,
+            )
+            savefig(fig, f"exp06a_dropped_{dgp_main}_ratio_main.{ext}", subdir="exp06")
 
     # 6b: sweep d with fixed m
-    m_fixed = 3
-    for dgp in ["D1", "D2"]:
-        print(f"  DGP: {dgp}, fixed m={m_fixed}")
-        d_vals, means, ci_lo, ci_hi = sweep_total_factors(dgp, m_fixed=m_fixed)
-        fig = plot_inflated_dimensions(dgp, d_vals, means, ci_lo, ci_hi, m_fixed)
-        savefig(fig, f"exp06b_inflate_{dgp}_m{m_fixed}.pdf", subdir="exp06")
-        savefig(
-            plot_inflated_dimensions(dgp, d_vals, means, ci_lo, ci_hi, m_fixed),
-            f"exp06b_inflate_{dgp}_m{m_fixed}.png", subdir="exp06",
-        )
+    if plot_only:
+        dgps_6b = config.get("dgps_6b", ["D1", "D2"])
+        for dgp in dgps_6b:
+            d = data["6b"][dgp]
+            d_vals = config["d_values_6b"]
+            means, ci_lo, ci_hi = d["means"], d["ci_lo"], d["ci_hi"]
+            tags = [("main", METRICS_MAIN)] if quick else [("main", METRICS_MAIN), ("apx", METRICS)]
+            for tag, mets in tags:
+                for ext in ("pdf", "png"):
+                    fig = plot_inflated_dimensions(dgp, d_vals, means, ci_lo, ci_hi, m_fixed, metrics=mets)
+                    savefig(fig, f"exp06b_inflate_{dgp}_m{m_fixed}_{tag}.{ext}", subdir="exp06")
+    else:
+        save_6b = {}
+        d_vals = None
+        for dgp in ["D1", "D2"]:
+            print(f"  DGP: {dgp}, fixed m={m_fixed}")
+            d_vals_dgp, means, ci_lo, ci_hi = sweep_total_factors(dgp, m_fixed=m_fixed)
+            save_6b[dgp] = {"means": means, "ci_lo": ci_lo, "ci_hi": ci_hi}
+            if d_vals is None:
+                d_vals = d_vals_dgp
+            tags = [("main", METRICS_MAIN)] if quick else [("main", METRICS_MAIN), ("apx", METRICS)]
+            for tag, mets in tags:
+                for ext in ("pdf", "png"):
+                    fig = plot_inflated_dimensions(dgp, d_vals_dgp, means, ci_lo, ci_hi, m_fixed, metrics=mets)
+                    savefig(fig, f"exp06b_inflate_{dgp}_m{m_fixed}_{tag}.{ext}", subdir="exp06")
 
-    # Sensitivity sweeps: factors for D2 × E4 and D2 × E5
-    from pathlib import Path
-    out_dir = Path(RESULTS_DIR / "exp06")
-    for enc in ["E4", "E5"]:
-        print(f"\n  Running sensitivity sweep: factors for D2 × {enc} …")
-        sweep_factors(
-            dgp="D2",
-            encoder=enc,
-            factor_values=[3, 5, 7, 10],
-            n_samples=N_SAMPLES,
-            n_seeds=N_SEEDS,
-            base_seed=BASE_SEED,
-            output_dir=out_dir,
-            metrics_to_compute=set(ALL_METRICS.keys()),
-            n_factors_ground_truth=D_TOTAL,
-        )
+        # Save all results
+        save_results("exp06", {"6a": save_6a, "6b": save_6b}, config={
+            "dgps": DGPS,
+            "d_total": D_TOTAL,
+            "m_fixed": m_fixed,
+            "m_values_6a": m_vals,
+            "d_values_6b": d_vals,
+            "dgps_6b": ["D1", "D2"],
+            "n_samples": N_SAMPLES,
+            "n_seeds": N_SEEDS,
+        })
+
+        # Sensitivity sweeps
+        if not quick:
+            from pathlib import Path
+            out_dir = Path(RESULTS_DIR / "exp06")
+            for enc in ["E4", "E5"]:
+                print(f"\n  Running sensitivity sweep: factors for D2 × {enc} …")
+                sweep_factors(
+                    dgp="D2",
+                    encoder=enc,
+                    factor_values=[3, 5, 7, 10],
+                    n_samples=N_SAMPLES,
+                    n_seeds=N_SEEDS,
+                    base_seed=BASE_SEED,
+                    output_dir=out_dir,
+                    metrics_to_compute=APX_METRICS,
+                    n_factors_ground_truth=D_TOTAL,
+                )
 
     print("Done.")
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--plot-only", action="store_true",
+                        help="Load saved results and regenerate plots")
+    parser.add_argument("--quick", action="store_true",
+                        help="Quick sanity check: main plots only, skip sensitivity")
+    args = parser.parse_args()
+    main(plot_only=args.plot_only, quick=args.quick)

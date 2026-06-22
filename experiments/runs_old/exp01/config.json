@@ -1,0 +1,12 @@
+{
+  "dgp_names": [
+    "D1",
+    "D2",
+    "D3",
+    "D4"
+  ],
+  "encoder": "E1",
+  "n_samples": 100,
+  "n_factors": 5,
+  "n_seeds": 5
+}

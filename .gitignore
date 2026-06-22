@@ -115,3 +115,5 @@ test_results/
 results/
 context_*
 AUDIT.md
+experiments/logs
+experiments/generated_jobs

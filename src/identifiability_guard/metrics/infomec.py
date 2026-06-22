@@ -125,15 +125,24 @@ def _logistic_regression_entropy(
     penalty=None,
     C: float = 1.0,
     random_state: Optional[int] = None,
+    X_test: Optional[np.ndarray] = None,
+    y_test: Optional[np.ndarray] = None,
 ) -> float:
     """
     Compute conditional entropy H(Y|X) using logistic regression.
 
+    When *X_test* and *y_test* are provided the model is fit on (X, y) and
+    the log-loss is evaluated on the held-out (X_test, y_test).  Otherwise
+    the in-sample loss is returned (original behaviour).
+
     Args:
-        X: Features of shape (n, d).
-        y: Discrete labels of shape (n,).
+        X: Features of shape (n, d) – training data.
+        y: Discrete labels of shape (n,) – training labels.
         penalty: Regularization penalty (None, 'l2', etc.).
         C: Inverse regularization strength (only used when penalty is not None).
+        random_state: Random seed for reproducibility.
+        X_test: Optional held-out features of shape (n_test, d).
+        y_test: Optional held-out labels of shape (n_test,).
 
     Returns:
         Cross-entropy loss (approximation of conditional entropy).
@@ -153,13 +162,10 @@ def _logistic_regression_entropy(
         class_weight="balanced",
         solver="lbfgs",
         max_iter=100,
-        n_jobs=-1,
     )
     if penalty is not None:
-        kwargs["penalty"] = penalty
+        kwargs["l1_ratio"] = 0 if penalty == "l2" else 1
         kwargs["C"] = C
-    else:
-        kwargs["penalty"] = None
 
     kwargs["random_state"] = random_state
     model = linear_model.LogisticRegression(**kwargs)
@@ -167,10 +173,17 @@ def _logistic_regression_entropy(
     try:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning)
+            warnings.filterwarnings("ignore", category=FutureWarning)
             warnings.filterwarnings(
                 "ignore", message=".*lbfgs failed to converge.*"
             )
             model.fit(X, y)
+
+        # Evaluate on held-out test set when provided
+        if X_test is not None and y_test is not None:
+            y_pred = model.predict_proba(X_test)
+            return metrics.log_loss(y_test, y_pred)
+
         y_pred = model.predict_proba(X)
         return metrics.log_loss(y, y_pred)
     except Exception:
@@ -184,6 +197,8 @@ def _compute_infoe(
     latents: np.ndarray,
     discrete_latents: bool = False,
     random_state: Optional[int] = None,
+    sources_test: Optional[np.ndarray] = None,
+    latents_test: Optional[np.ndarray] = None,
 ) -> tuple:
     """
     Compute InfoE (Explicitness) score.
@@ -192,45 +207,65 @@ def _compute_infoe(
     the latent codes using logistic regression. Higher values indicate
     that factors are more explicitly represented.
 
+    When *sources_test* and *latents_test* are provided, logistic regression is
+    fit on (sources, latents) and evaluated on the held-out test arrays.
+
     Args:
         sources: Ground-truth factors of shape (n, num_sources).
         latents: Learned codes of shape (n, num_latents).
         discrete_latents: Whether latents are discrete.
+        random_state: Random seed for reproducibility.
+        sources_test: Optional held-out ground-truth factors.
+        latents_test: Optional held-out learned codes.
 
     Returns:
         Tuple of (infoe_score, nan_info) where nan_info tracks NaN counts.
     """
     import warnings as _warnings
 
+    oos = sources_test is not None and latents_test is not None
+
     normalized_predictive_information = []
     processed_sources = _process_sources(sources)
 
     if discrete_latents:
         try:
-            processed_latents = preprocessing.OneHotEncoder(
-                sparse_output=False
-            ).fit_transform(latents)
+            encoder = preprocessing.OneHotEncoder(sparse_output=False)
         except TypeError:
-            # Older sklearn versions
-            processed_latents = preprocessing.OneHotEncoder(
-                sparse=False
-            ).fit_transform(latents)
+            encoder = preprocessing.OneHotEncoder(sparse=False)
+        processed_latents = encoder.fit_transform(latents)
+        if oos:
+            processed_latents_test = encoder.transform(latents_test)
     else:
-        processed_latents = preprocessing.StandardScaler().fit_transform(
-            latents
-        )
+        scaler = preprocessing.StandardScaler().fit(latents)
+        processed_latents = scaler.transform(latents)
+        if oos:
+            processed_latents_test = scaler.transform(latents_test)
+
+    if oos:
+        processed_sources_test = _process_sources(sources_test)
 
     nan_entropy_count = 0
 
     for i in range(processed_sources.shape[1]):
+        # Build test kwargs for _logistic_regression_entropy
+        lr_test_kwargs: Dict = {}
+        if oos:
+            lr_test_kwargs["X_test"] = processed_latents_test
+            lr_test_kwargs["y_test"] = processed_sources_test[:, i]
+
         # Conditional entropy H(S_i | Z)
         h_si_given_z = _logistic_regression_entropy(
             processed_latents, processed_sources[:, i],
             random_state=random_state,
+            **lr_test_kwargs,
         )
 
-        # Marginal entropy H(S_i) computed analytically from class frequencies
-        labels_i = processed_sources[:, i]
+        # Marginal entropy H(S_i) — use test labels when doing OOS
+        if oos:
+            labels_i = processed_sources_test[:, i]
+        else:
+            labels_i = processed_sources[:, i]
         _, counts = np.unique(labels_i, return_counts=True)
         probs = counts / counts.sum()
         h_si = float(-np.sum(probs * np.log(probs + EPS)))
@@ -536,6 +571,33 @@ class InfoEMetric(BaseMetric):
             primary_score=float(infoe),
             metadata={"nan_info": nan_info},
         )
+
+    def compute_oos(
+        self,
+        Z_train: np.ndarray,
+        Z_hat_train: np.ndarray,
+        Z_test: np.ndarray,
+        Z_hat_test: np.ndarray,
+    ) -> MetricResult:
+        """Fit logistic regression on train, evaluate InfoE on held-out test."""
+        self._validate_samples(Z_train, Z_hat_train)
+        self._validate_samples(Z_test, Z_hat_test)
+        infoe, nan_info = _compute_infoe(
+            sources=Z_train,
+            latents=Z_hat_train,
+            discrete_latents=self.discrete_latents,
+            random_state=self.random_state,
+            sources_test=Z_test,
+            latents_test=Z_hat_test,
+        )
+        nan_info["oos"] = True
+        result = MetricResult(
+            primary_score=float(infoe),
+            metadata={"nan_info": nan_info},
+        )
+        self._validate_result_type(result)
+        self._validate_result_range(result)
+        return result
 
 
 class InfoCMetric(BaseMetric):

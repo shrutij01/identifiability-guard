@@ -24,19 +24,20 @@ from utils import (
     make_registry,
     get_color, get_marker, display_name,
     DEFAULT_N_FACTORS, DEFAULT_N_SEEDS, DEFAULT_BASE_SEED,
-    ALL_METRICS,
+    MAIN_METRICS, APX_METRICS,
     RESULTS_DIR,
 )
 from sensitivity import sweep_samples
 
 # ── Configuration ──────────────────────────────────────────────────────────
 DGPS = ["D1", "D2", "D3", "D4"]
-ENCODERS = ["E1", "E2", "E3"]
-SAMPLE_VALUES = [50, 100, 200, 500, 1000]
+ENCODERS = ["E1", "E2", "E3", "E7"]
+SAMPLE_VALUES = [50, 100, 200, 500, 1000, 2000, 5000]
 N_FACTORS = DEFAULT_N_FACTORS
 N_SEEDS = DEFAULT_N_SEEDS
 BASE_SEED = DEFAULT_BASE_SEED
-METRICS = sorted(ALL_METRICS.keys())
+METRICS = sorted(APX_METRICS)
+METRICS_MAIN = sorted(MAIN_METRICS)
 
 
 # ── Experiment logic ───────────────────────────────────────────────────────
@@ -96,8 +97,10 @@ def run_all_combos():
     return results
 
 
-def plot_sample_sensitivity_grid(results):
+def plot_sample_sensitivity_grid(results, metrics=None):
     """Grid of subplots: one per D×E combo."""
+    if metrics is None:
+        metrics = METRICS
     setup_plot_style()
     keys = list(results.keys())
     n = len(keys)
@@ -110,12 +113,12 @@ def plot_sample_sensitivity_grid(results):
     for idx, key in enumerate(keys):
         ax = axes_flat[idx]
         r = results[key]
-        for m in METRICS:
+        for m in metrics:
             c = get_color(m)
             ax.plot(SAMPLE_VALUES, r["means"][m], marker=get_marker(m),
                     color=c, label=display_name(m), markersize=4)
             ax.fill_between(SAMPLE_VALUES, r["ci_lo"][m], r["ci_hi"][m],
-                            color=c, alpha=0.1)
+                            color=c, alpha=0.25)
         ax.set_xlabel("n_samples")
         ax.set_title(key)
         ax.set_xscale("log")
@@ -140,20 +143,66 @@ def plot_sample_sensitivity_grid(results):
     return fig
 
 
-def plot_variance_heatmap(results):
+def plot_sample_sensitivity_main(results, metrics=None):
+    """Main-text 2x2 grid for key D×E combos (D1×E1, D1×E2, D2×E1, D1×E3)."""
+    if metrics is None:
+        metrics = METRICS_MAIN
+    setup_plot_style()
+    combos = ["D1×E1", "D1×E2", "D2×E1", "D1×E3"]
+    combos = [k for k in combos if k in results]
+    n = len(combos)
+    ncols = min(2, n)
+    nrows = (n + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols, figsize=(7 * ncols, 5 * nrows),
+                             sharey=True)
+    axes_flat = np.array(axes).flatten()
+
+    for idx, key in enumerate(combos):
+        ax = axes_flat[idx]
+        r = results[key]
+        for m in metrics:
+            c = get_color(m)
+            ax.plot(SAMPLE_VALUES, r["means"][m], marker=get_marker(m),
+                    color=c, label=display_name(m), markersize=5)
+            ax.fill_between(SAMPLE_VALUES, r["ci_lo"][m], r["ci_hi"][m],
+                            color=c, alpha=0.25)
+        ax.set_xlabel("n_samples")
+        ax.set_title(key)
+        ax.set_xscale("log")
+        ax.set_xticks(SAMPLE_VALUES)
+        ax.set_xticklabels([str(v) for v in SAMPLE_VALUES], fontsize=7)
+        ax.xaxis.set_minor_formatter(mticker.NullFormatter())
+        ax.grid(True, alpha=0.3)
+        ax.set_ylim(-0.05, 1.05)
+
+    for idx in range(len(combos), len(axes_flat)):
+        axes_flat[idx].set_visible(False)
+
+    axes_flat[0].set_ylabel("Metric score")
+    handles, labels = axes_flat[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=4, fontsize=8,
+               bbox_to_anchor=(0.5, -0.06))
+    fig.suptitle("Sample sensitivity — key D×E combinations", y=1.01)
+    fig.tight_layout()
+    return fig
+
+
+def plot_variance_heatmap(results, metrics=None):
     """Heatmap of metric std at the smallest sample size across D×E combos."""
+    if metrics is None:
+        metrics = METRICS
     setup_plot_style()
     keys = list(results.keys())
     small_idx = 0  # index into SAMPLE_VALUES for the smallest n
-    data = np.full((len(keys), len(METRICS)), np.nan)
+    data = np.full((len(keys), len(metrics)), np.nan)
     for i, key in enumerate(keys):
-        for j, m in enumerate(METRICS):
+        for j, m in enumerate(metrics):
             data[i, j] = results[key]["stds"][m][small_idx]
 
-    fig, ax = plt.subplots(figsize=(max(8, len(METRICS) * 0.9), max(4, len(keys) * 0.6)))
+    fig, ax = plt.subplots(figsize=(max(8, len(metrics) * 0.9), max(4, len(keys) * 0.6)))
     im = ax.imshow(data, cmap="YlOrRd", aspect="auto")
-    ax.set_xticks(range(len(METRICS)))
-    ax.set_xticklabels([display_name(m) for m in METRICS], rotation=45,
+    ax.set_xticks(range(len(metrics)))
+    ax.set_xticklabels([display_name(m) for m in metrics], rotation=45,
                        ha="right", fontsize=8)
     ax.set_yticks(range(len(keys)))
     ax.set_yticklabels(keys, fontsize=9)
@@ -168,20 +217,22 @@ def plot_variance_heatmap(results):
     return fig
 
 
-def plot_nan_count_heatmap(results):
+def plot_nan_count_heatmap(results, metrics=None):
     """Heatmap showing NaN counts at small n across combos."""
+    if metrics is None:
+        metrics = METRICS
     setup_plot_style()
     keys = list(results.keys())
     small_idx = 0
-    data = np.zeros((len(keys), len(METRICS)))
+    data = np.zeros((len(keys), len(metrics)))
     for i, key in enumerate(keys):
-        for j, m in enumerate(METRICS):
+        for j, m in enumerate(metrics):
             data[i, j] = results[key]["nan_counts"][m][small_idx]
 
-    fig, ax = plt.subplots(figsize=(max(8, len(METRICS) * 0.9), max(4, len(keys) * 0.6)))
+    fig, ax = plt.subplots(figsize=(max(8, len(metrics) * 0.9), max(4, len(keys) * 0.6)))
     im = ax.imshow(data, cmap="Reds", aspect="auto", vmin=0, vmax=N_SEEDS)
-    ax.set_xticks(range(len(METRICS)))
-    ax.set_xticklabels([display_name(m) for m in METRICS], rotation=45,
+    ax.set_xticks(range(len(metrics)))
+    ax.set_xticklabels([display_name(m) for m in metrics], rotation=45,
                        ha="right", fontsize=8)
     ax.set_yticks(range(len(keys)))
     ax.set_yticklabels(keys, fontsize=9)
@@ -197,49 +248,76 @@ def plot_nan_count_heatmap(results):
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
-def main():
+def main(plot_only=False, quick=False):
+    from results_io import save_results, load_results
+
     print("=" * 70)
     print("Experiment 10 – Sample sensitivity")
     print("=" * 70)
-    results = run_all_combos()
 
-    fig1 = plot_sample_sensitivity_grid(results)
-    savefig(fig1, "exp10_sample_sensitivity_grid.pdf", subdir="exp10")
-    savefig(
-        plot_sample_sensitivity_grid(results),
-        "exp10_sample_sensitivity_grid.png", subdir="exp10",
-    )
+    if plot_only:
+        data, config = load_results("exp10")
+        results = data
+        # Restore SAMPLE_VALUES for plotting
+        global SAMPLE_VALUES
+        SAMPLE_VALUES = config["sample_values"]
+    else:
+        results = run_all_combos()
+        save_results("exp10", results, config={
+            "sample_values": SAMPLE_VALUES,
+            "dgps": DGPS,
+            "encoders": ENCODERS,
+            "n_factors": N_FACTORS,
+            "n_seeds": N_SEEDS,
+        })
 
-    fig2 = plot_variance_heatmap(results)
-    savefig(fig2, "exp10_variance_heatmap.pdf", subdir="exp10")
-    savefig(
-        plot_variance_heatmap(results),
-        "exp10_variance_heatmap.png", subdir="exp10",
-    )
+    tags = [("main", METRICS_MAIN)] if quick else [("main", METRICS_MAIN), ("apx", METRICS)]
+    for tag, mets in tags:
+        for ext in ("pdf", "png"):
+            savefig(
+                plot_sample_sensitivity_grid(results, metrics=mets),
+                f"exp10_sample_sensitivity_grid_{tag}.{ext}", subdir="exp10",
+            )
+            savefig(
+                plot_variance_heatmap(results, metrics=mets),
+                f"exp10_variance_heatmap_{tag}.{ext}", subdir="exp10",
+            )
+            savefig(
+                plot_nan_count_heatmap(results, metrics=mets),
+                f"exp10_nan_count_heatmap_{tag}.{ext}", subdir="exp10",
+            )
 
-    fig3 = plot_nan_count_heatmap(results)
-    savefig(fig3, "exp10_nan_count_heatmap.pdf", subdir="exp10")
-    savefig(
-        plot_nan_count_heatmap(results),
-        "exp10_nan_count_heatmap.png", subdir="exp10",
-    )
+    # Main-text 2x2 grid
+    for ext in ("pdf", "png"):
+        savefig(
+            plot_sample_sensitivity_main(results, metrics=METRICS_MAIN),
+            f"exp10_sample_sensitivity_main.{ext}", subdir="exp10",
+        )
 
-    # Sensitivity sweep: sample size for D2 × E3
-    print("\n  Running sensitivity sweep: samples for D2 × E3 …")
-    from pathlib import Path
-    sweep_samples(
-        dgp="D2",
-        encoder="E3",
-        sample_values=SAMPLE_VALUES,
-        n_factors=N_FACTORS,
-        n_seeds=N_SEEDS,
-        base_seed=BASE_SEED,
-        output_dir=Path(RESULTS_DIR / "exp10"),
-        metrics_to_compute=set(ALL_METRICS.keys()),
-    )
+    if not plot_only and not quick:
+        # Sensitivity sweep: sample size for D2 × E3
+        print("\n  Running sensitivity sweep: samples for D2 × E3 …")
+        from pathlib import Path
+        sweep_samples(
+            dgp="D2",
+            encoder="E3",
+            sample_values=SAMPLE_VALUES,
+            n_factors=N_FACTORS,
+            n_seeds=N_SEEDS,
+            base_seed=BASE_SEED,
+            output_dir=Path(RESULTS_DIR / "exp10"),
+            metrics_to_compute=APX_METRICS,
+        )
 
     print("Done.")
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--plot-only", action="store_true",
+                        help="Load saved results and regenerate plots")
+    parser.add_argument("--quick", action="store_true",
+                        help="Quick sanity check: main plots only, skip sensitivity")
+    args = parser.parse_args()
+    main(plot_only=args.plot_only, quick=args.quick)

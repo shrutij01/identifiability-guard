@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UAI 2026 Submission 1105 — Review Summary</title>
+<style>
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 920px; margin: 2em auto; padding: 0 1em; color: #222; line-height: 1.55; }
+  h1 { border-bottom: 2px solid #333; padding-bottom: 0.3em; }
+  h2 { margin-top: 2em; border-bottom: 1px solid #999; padding-bottom: 0.2em; }
+  h3 { margin-top: 1.2em; }
+  .legend { background: #f4f4f4; padding: 0.6em 1em; border-radius: 6px; font-size: 0.95em; }
+  .legend span { font-weight: bold; padding: 0 0.2em; }
+  .strength { color: #1a7f37; }   /* green  */
+  .weakness { color: #c0392b; }   /* red    */
+  .todo     { color: #1f6feb; }   /* blue   */
+  .meta { background: #fafafa; border-left: 3px solid #999; padding: 0.4em 0.8em; margin: 0.6em 0 1em; font-size: 0.92em; }
+  ul { margin-top: 0.3em; }
+  li { margin-bottom: 0.5em; }
+  .label { font-weight: bold; }
+  .green-label { color: #1a7f37; font-weight: bold; }
+  .red-label   { color: #c0392b; font-weight: bold; }
+  .blue-label  { color: #1f6feb; font-weight: bold; }
+  .summary { font-style: italic; color: #444; }
+</style>
+</head>
+<body>
+
+<h1>UAI 2026 — Submission 1105: Reviewer Summary</h1>
+
+<div class="legend">
+  Color key:
+  <span class="strength">■ Green = Strengths</span> &nbsp;|&nbsp;
+  <span class="weakness">■ Red = Weaknesses</span> &nbsp;|&nbsp;
+  <span class="todo">■ Blue = TODOs / Required Experiments / Questions</span>
+</div>
+
+<!-- ===================================================================== -->
+<h2>Reviewer YTF7 — Rating: 6 (Weak Accept), Confidence: 4</h2>
+
+<div class="meta">
+  <b>Scores:</b> Novelty 3 | Correctness 3 | Evidence 3 | Reproducibility 3 | Writing 3<br>
+  <b>Trajectory:</b> Resolving Fig 1/Tab 3 contradiction + Anthropic SAE case study → 8;
+  contradiction only → 7; unresolved → 5.
+</div>
+
+<p class="summary"><b>Summary:</b> Frames metric failure as population-level misspecification (not finite-sample noise). Builds a factor-structure × encoder-geometry taxonomy, formalizes desiderata P1–P4, proves no metric satisfies all four, and gives a closed-form MCC failure under D_ρ + E3 (§F.1) plus a null-encoder bound E[MCC] ≳ √(2 log(m/n)) (§F.3).</p>
+
+<h3 class="green-label">Strengths</h3>
+<ul class="strength">
+  <li><b>Novel framing:</b> Metric failure as population-level misspecification rather than finite-sample noise / inductive bias. Orthogonal to Locatello et al. (2019) — shows that even <i>supervised</i> identifiability metrics are structurally misspecified under conditions identifiability theorems explicitly permit.</li>
+  <li><b>Tight theory–experiment coupling:</b> §3.1 + §F.1 derive MCC's closed form under D_ρ + E3 (Eq. 18–44); Fig 2 visualizes the analytical prediction. §F.3 derives E[MCC] ≳ √(2 log(m/n)) for a null encoder via CLT + Hungarian-matching; Fig 5's heatmap independently verifies that <b>m/n (not m/d)</b> controls false-positive inflation. The m/n result is the most striking — names an evaluation-setting variable routinely exceeded in current mech-interp work.</li>
+  <li><b>Practical artifacts unusual for a formal paper:</b> 10-item practitioner checklist (App A), metric × property truth table (Tab 3), explicit numerical thresholds for m/n and m/d (Tab 1).</li>
+  <li><b>Systematic survey:</b> App C reviews 62 CRL / nonlinear-ICA papers (2020–2025, NeurIPS/ICLR/ICML/AISTATS/UAI/AAAI/CLeAR/JMLR). 25 used MCC, 9 used R², only 2 DCI — quantifies how widespread the misuse is.</li>
+  <li><b>Encoder taxonomy E1–E9:</b> Spans every dimension-ratio regime (m=d, m&lt;d, m&gt;d incl. four overcomplete geometries + null baseline). Each has an analytic construction → reproducible without trained encoders.</li>
+  <li><b>Resistor-circuit running example (§2):</b> R = R₀(1 + αT), V = IR — grounds abstract D_f / d_eff in physical intuition.</li>
+</ul>
+
+<h3 class="red-label">Weaknesses</h3>
+<ul class="weakness">
+  <li><b>Headline contradiction on R²'s P3 status:</b> Fig 1 caption (p. 2) says "Only R² is robust across (P1), (P3), (P4)." Tab 3 (p. 8) marks R² × P3 as ✗. Fig 4 caption says "R² collapses for nonlinear E6" (a P3 failure). One of three takeaway sentences — if wrong, must be reframed as "no single metric satisfies P1, P3, P4 jointly" (strictly weaker positioning).</li>
+  <li><b>Tab 3 conflates two distinct MCC failures:</b> §3.3 notes "MCC cannot be used for distributed codes (E8)" — a second failure mode under overcompleteness not flagged in Tab 3's MCC row (single ✗). Either clarify or split the row.</li>
+  <li><b>Only analytical encoders, no trained-encoder evidence:</b> Acknowledged, but reviewers will ask first. Anthropic's Llama-3 / Claude-Sonnet SAEs have m ≈ 65k, n &lt; 10k, so m/n ≥ 6.5 → §3.4 bound √(2 log 6.5) ≈ 2.16 (saturates MCC). Reported MCCs may be statistical floor effects.</li>
+  <li><b>MIG, InfoMEC, T-MEX appear only in Tab 3 + §G:</b> §3 walks through only MCC, DCI-D, R². Two of these (InfoMEC, T-MEX) are 2023+ metrics rising in SAE evaluation — burying their failure cases leaves "no metric works" half-supported.</li>
+  <li><b>No impossibility lower bound</b> for "no metric satisfies P1–P4." Even a sketch (e.g., must use higher-order moments / know d_eff / include null calibration) would convert this from negative survey into structural limit.</li>
+  <li><b>R²'s collapse on nonlinear E6 has no mechanistic explanation:</b> Paper positions R² as "most robust"; Fig 4 shows it collapsing. §3.3 describes in one sentence with no algebra. §F should derive closed-form / asymptotic for R² under E6 in parallel to §F.1's MCC analysis.</li>
+  <li><b>§C 62-paper survey lacks methodological transparency:</b> Semantic Scholar API mentioned, but not query strings, inclusion/exclusion criteria, dedup rules, inter-rater reliability. The 25/62 number is the headline motivating the paper.</li>
+  <li><b>Finite-sample → asymptotic transition in §3.4 lacks calibration:</b> Text says √(2 log(m/n)) dominates for m/n ≳ 0.1 but no theory-vs-empirics relative-error table. For m/n &lt; 1, log(m/n) is negative → bound undefined; yet Fig 5 sweeps to m/n = 0.01. Need continuation convention.</li>
+  <li><b>P1 + P4 interact under correlated factors:</b> Null-encoder experiments assume ρ and m/n vary independently, but correlated GT factors drop effective dimension and change the constant in √(2 log(m/n)).</li>
+  <li><b>Definition 2:</b> d_eff = d − k assumes <i>independent</i> constraints. Under multiple/non-independent constraints not well-defined.</li>
+  <li><b>Code release deferred to acceptance.</b> OpenReview supports anonymous supplementary at submission — current stance reduces reproducibility unnecessarily.</li>
+  <li><b>Minor:</b> Tab 2 caption has unfilled "[CITE]" for MIG (should be Chen et al. 2018). Tab 3 ✓/~/✗ undefined (e.g., "✓ ≥ 95% of settings, ~ 50–95%, ✗ &lt; 50%"). p. 2 "MCC scaling in the order of √(2 log m/n)" should be "scales as √(2 log(m/n))." Fig 1 P3 panel caption should state GT identifiability holds throughout the m/d sweep (so upward MCC trend isn't read as real identifiability change).</li>
+</ul>
+
+<h3 class="blue-label">TODOs / Required Experiments / Questions</h3>
+<ul class="todo">
+  <li><b>[Required Experiment 1] Anthropic SAE case study.</b> For m = 65,536 and n ∈ {500, 1000, 5000, 10000}, §3.4 predicts null-MCC bounds ≈ 2.16, 1.92, 1.52, 1.27 (first two saturate). Compare to Anthropic's published MCC numbers for ≥ 2 values of n. Publishable either way (live problem identified, or calibration data point).</li>
+  <li><b>[Required Experiment 2] Locatello et al. (2019) pretrained-model application.</b> Top-10% and bottom-10% MCC scores from their 7,000 pretrained models (50 each), apply Tab 1 m/n threshold, re-report MCC. Top-10% drop ≥ 20% with bottom-10% unaffected → checklist validated. Models are public → executable in rebuttal window.</li>
+  <li><b>[Required Experiment 3] Resolve Fig 1 / Tab 3 / Fig 4 inconsistency.</b> Either correct Fig 1 caption to "Only R² is robust across (P1) and (P4); all metrics fail on (P3) for some encoder geometry," or revise Tab 3 R² × P3 from ✗ to ~ with explicit threshold definition. Must not survive to camera-ready.</li>
+  <li><b>[Technical] Move ρ → 1 limit of Eq. (39) into §3.1:</b> Numerator 1 + ερ → 1 + ε; denominator √(1 + ε² + 2ερ) → 1 + ε; MCC → (1/3)(1+2) = 1. One-line strengthens "MCC saturates at 1 for entangled encoder as ρ → 1."</li>
+  <li><b>[Technical] §F.3 / Cai &amp; Jiang (2011) Thm 2:</b> Hungarian matching on best-of-m introduces a multiplicative factor — state exact constant + cite lemma. Also state continuation convention for m/n &lt; 1.</li>
+  <li><b>[Q1] Does R² satisfy P3?</b> Single answer + correct the inconsistent location.</li>
+  <li><b>[Q2] Can P1–P4 merge into a single soundness axiom?</b> Do P1 + P2 imply P3 for any natural encoder class?</li>
+  <li><b>[Q3] Anthropic Llama-3 SAE (m ≈ 65k, n &lt; 10k):</b> §3.4 bound is √(2 log 6.5) ≈ 2.16. Compare to their reported MCC-type metrics during rebuttal.</li>
+  <li><b>[Q4] Closed-form / asymptotic for R² under nonlinear overcomplete E6?</b></li>
+  <li><b>[Q5] Will §C survey's queries, inclusion/exclusion criteria, inter-rater reliability be published in appendix?</b></li>
+  <li><b>[Q6] When will stress-test suite + practitioner checklist be released?</b> anonymous.4open.science link available now?</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2>Reviewer wGET — Rating: 7 (Accept), Confidence: 4</h2>
+
+<div class="meta">
+  <b>Scores:</b> Novelty 3 | Correctness 3 | Evidence 3 | Reproducibility 3 | Writing 4 (Excellent)
+</div>
+
+<p class="summary"><b>Summary:</b> Studies common evaluation metrics in identifiable representation learning and characterizes failure scenarios: correlated latents, redundancy from deterministic (causal) relationships, over-parameterized encoders, low representation-to-sample ratios. Each scenario gets desired property + synthetic empirical examples + (sometimes) theoretical justification.</p>
+
+<h3 class="green-label">Strengths</h3>
+<ul class="strength">
+  <li><b>Important, often-overlooked problem:</b> Whether commonly used metrics faithfully reflect identifiability. Analyzing failure cases from a novel perspective benefits the community.</li>
+  <li><b>Excellent writing:</b> Well-structured, well-explained, clear notation, illustrative examples, highlighted takeaways.</li>
+  <li><b>Thorough empirical + theoretical analysis</b> — generally well supports the claims and intuition.</li>
+</ul>
+
+<h3 class="red-label">Weaknesses</h3>
+<ul class="weakness">
+  <li><b>§3.2's "recover lossless part only" framing may not align with identifiable representation learning's goal.</b> CRL aims to recover the full set of causal variables incl. graphical structure. Even in deterministic settings, latents carry semantic meaning → metric should arguably penalize missing variables more explicitly. Need to explain relationship between these two goals.</li>
+  <li><b>All empirical analysis on synthetic encoders</b> — limits practical impact, leaves gap to real trained models (acknowledged).</li>
+  <li><b>No improved metric or design principles proposed</b> beyond the practical checklist. The checklist assumes access to ground-truth info (e.g., latent dimensionality) often unavailable in practice — circular: if dimensionality is known, model design could already enforce structure, reducing need for evaluation guidelines.</li>
+</ul>
+
+<h3 class="blue-label">TODOs / Comments / Questions</h3>
+<ul class="todo">
+  <li><b>Fig 3 caption mismatch:</b> Should be the middle one based on main-text context; one panel is missing.</li>
+  <li><b>Notation inconsistency:</b> D1–D4 in Fig 3 title differs from main-text notation.</li>
+  <li><b>Clarify the relationship between "lossless recovery" goal and full causal-variable recovery (CRL goal).</b></li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2>Reviewer hjjj — Rating: 6 (Weak Accept), Confidence: 3</h2>
+
+<div class="meta">
+  <b>Scores:</b> Novelty 3 | Correctness 3 | Evidence 3 | Reproducibility 2 (Fair) | Writing 3
+</div>
+
+<p class="summary"><b>Summary:</b> Asks whether MCC, R², DCI actually measure recovery of GT factors. Shows they're trustworthy only under specific structural assumptions; otherwise systematic error. Contributions: DGP × encoder taxonomy, validity-domain characterization, reproducible stress-test suite, practitioner evaluation guideline.</p>
+
+<h3 class="green-label">Strengths</h3>
+<ul class="strength">
+  <li><b>Important, under-explored problem:</b> When can identifiability metrics be interpreted as meaningful evidence? Central in disentanglement / nonlinear ICA / CRL but often left implicit.</li>
+  <li><b>Clear, useful account of when/why metrics fail.</b> Taxonomy cleanly separates DGP assumptions from encoder geometry; analysis makes existing-metric failure modes precise. Not just critical — provides structured understanding of metric validity.</li>
+  <li><b>Empirical study aligned with objective:</b> Controlled constructions isolate metric behavior from optimization/implementation effects — right design for the question.</li>
+  <li><b>Well organized + easy to follow.</b> Examples and takeaways chosen effectively. Practical-guidance appendix particularly useful — translates findings into concrete advice.</li>
+</ul>
+
+<h3 class="red-label">Weaknesses</h3>
+<ul class="weakness">
+  <li><b>Practical scope limited by absence of learned-encoder evidence.</b> Synthetic-encoder analysis is intentional, but unclear when proposed geometries (esp. overcomplete ones) arise under realistic training dynamics.</li>
+  <li><b>Overcomplete encoder taxonomy stylized even at most complex (E8):</b> Relies on disjoint-index constructions — useful for isolating failures but distant from general mixed/distributed code geometries that may occur in practice. E8 doesn't model many-to-many mappings (single latent → multiple factors).</li>
+  <li><b>Stronger as diagnosis than as resolution:</b> Convincingly shows no existing metric is reliable across all settings, but practical outcome is taxonomy + stress-tests + cautionary guidance, not a concrete protocol or new metric.</li>
+  <li><b>Categories' necessity not justified by empirical observations on benchmark data</b> (e.g., Shapes3D). Unclear under what conditions / inductive bias to expect the characterized behaviors.</li>
+  <li><b>Reproducibility weakened by deferred code release</b> — controlled settings depend heavily on metric implementations (MCC, DCI-D, R²).</li>
+  <li><b>Notation collision:</b> "n" used for both data generative process and number of samples.</li>
+  <li><b>Proposition 1 framing:</b> Reads more like an example showing MCC failure than a generalizable claim — re-frame with explicit assumptions and quantitative relation.</li>
+</ul>
+
+<h3 class="blue-label">TODOs / Questions</h3>
+<ul class="todo">
+  <li><b>Add empirical evidence on benchmarks (e.g., Shapes3D)</b> to justify that the considered encoder-geometry categories are <i>necessary</i> — i.e., observed under realistic inductive biases.</li>
+  <li><b>Extend E8 / overcomplete taxonomy</b> beyond disjoint-index constructions to many-to-many mappings.</li>
+  <li><b>Re-frame Proposition 1</b> with explicit assumptions and quantitative relations.</li>
+  <li><b>Disambiguate notation</b> for "n" (DGP vs sample count).</li>
+  <li><b>[Q1] Are there dimensionality-reduction approaches that properly handle the m &gt; d case? Under what assumptions?</b></li>
+  <li><b>[Q2] Can we properly decide d (or d_eff) by estimating intrinsic dimension from data observations?</b></li>
+  <li><b>Release code earlier</b> (anonymous link) to strengthen reproducibility.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2>Cross-Reviewer Synthesis</h2>
+
+<h3 class="green-label">Consensus Strengths (all three)</h3>
+<ul class="strength">
+  <li>Important and under-explored problem; novel framing of metric failure under explicit structural assumptions.</li>
+  <li>Clear DGP × encoder-geometry taxonomy; precise characterization of failure modes.</li>
+  <li>Tight theory–experiment coupling; well-organized writing; useful practitioner-facing artifacts.</li>
+</ul>
+
+<h3 class="red-label">Consensus Weaknesses (cited by multiple reviewers)</h3>
+<ul class="weakness">
+  <li><b>No learned-encoder evidence</b> (YTF7, wGET, hjjj — all three).</li>
+  <li><b>Diagnostic, not constructive:</b> No improved metric or design principle, only a checklist (wGET, hjjj).</li>
+  <li><b>Code deferred to acceptance</b> weakens reproducibility (YTF7, hjjj).</li>
+  <li><b>Caption / notation inconsistencies</b> (Fig 1 vs Tab 3 vs Fig 4 — YTF7; Fig 3 caption — wGET; D1–D4 notation — wGET; "n" overload — hjjj).</li>
+</ul>
+
+<h3 class="blue-label">Highest-Leverage Rebuttal Actions</h3>
+<ul class="todo">
+  <li><b>Top priority — Fix Fig 1 / Tab 3 / Fig 4 R² × P3 contradiction.</b> YTF7 says this alone moves score 6→7.</li>
+  <li><b>Top priority — Anthropic SAE case study</b> (m ≈ 65k, n &lt; 10k → bound 2.16). YTF7: 6→8 with this added.</li>
+  <li>Apply Tab 1 thresholds to Locatello et al. (2019) public pretrained models; report top-10% / bottom-10% MCC drops.</li>
+  <li>Add at least one benchmark-data experiment (e.g., Shapes3D) to justify encoder-geometry categories' empirical relevance (hjjj).</li>
+  <li>Release anonymous code link (anonymous.4open.science) during rebuttal — addresses YTF7 + hjjj reproducibility concerns.</li>
+  <li>Move ρ → 1 closed form into §3.1; derive R² closed-form/asymptotic for nonlinear E6 in §F (parallels §F.1).</li>
+  <li>Add §C survey methodology (queries, inclusion/exclusion, inter-rater reliability) to appendix.</li>
+  <li>Clarify "lossless recovery" vs full-causal-variable recovery framing (wGET).</li>
+  <li>Address d_eff under non-independent constraints (Definition 2); state continuation convention for m/n &lt; 1 in §F.3.</li>
+  <li>Sketch an impossibility lower bound for P1–P4 (or conjecture form) — converts negative survey into structural limit.</li>
+</ul>
+
+</body>
+</html>

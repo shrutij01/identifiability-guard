@@ -50,15 +50,17 @@ DEFAULT_OUTPUT_DIR = "results/sensitivity"
 
 def setup_plot_style():
     """Set up matplotlib style for camera-ready plots."""
-    mpl.rcParams['font.size'] = 11
-    mpl.rcParams['axes.labelsize'] = 12
-    mpl.rcParams['axes.titlesize'] = 13
-    mpl.rcParams['xtick.labelsize'] = 10
-    mpl.rcParams['ytick.labelsize'] = 10
-    mpl.rcParams['legend.fontsize'] = 10
-    mpl.rcParams['figure.titlesize'] = 14
-    mpl.rcParams['lines.linewidth'] = 2
-    mpl.rcParams['lines.markersize'] = 6
+    mpl.rcParams['font.size'] = 14
+    mpl.rcParams['axes.labelsize'] = 16
+    mpl.rcParams['axes.titlesize'] = 18
+    mpl.rcParams['xtick.labelsize'] = 13
+    mpl.rcParams['ytick.labelsize'] = 13
+    mpl.rcParams['legend.fontsize'] = 12
+    mpl.rcParams['figure.titlesize'] = 18
+    mpl.rcParams['lines.linewidth'] = 2.5
+    mpl.rcParams['lines.markersize'] = 7
+    mpl.rcParams['mathtext.fontset'] = 'stix'
+    mpl.rcParams['font.family'] = 'STIXGeneral'
 
 
 def evaluate_dgp_encoder_combination(
@@ -274,8 +276,8 @@ def sweep_correlation(
     # Create plot
     plot_sensitivity(
         stats,
-        param_name="Correlation Coefficient",
-        title=f"Sensitivity to Factor Correlation\n{dgp} + {encoder}",
+        param_name=r"Correlation ($\rho$)",
+        title=f"Sensitivity to correlation\n{dgp} + {encoder}",
         output_path=output_dir / f"sweep_correlation_{encoder}.png"
     )
     
@@ -329,8 +331,8 @@ def sweep_nonlinearity(
     # Create plot
     plot_sensitivity(
         stats,
-        param_name="Nonlinearity Strength",
-        title=f"Sensitivity to Nonlinearity\n{dgp} + {encoder}",
+        param_name=r"Non-linearity ($\alpha$)",
+        title=f"Sensitivity to non-linearity\n{dgp} + {encoder}",
         output_path=output_dir / f"sweep_nonlinearity_{dgp}.png"
     )
     
@@ -398,8 +400,8 @@ def sweep_encoder_nonlinearity(
     # Create plot
     plot_sensitivity(
         stats,
-        param_name="Encoder Nonlinearity Strength",
-        title=f"Sensitivity to Encoder Nonlinearity ({nonlinearity_type})\n{dgp} + {encoder}",
+        param_name=r"Non-linearity ($\alpha$)",
+        title=f"Sensitivity to encoder non-linearity ({nonlinearity_type})\n{dgp} + {encoder}",
         output_path=output_dir / f"sweep_encoder_nl_{dgp}_{nonlinearity_type}.png"
     )
 
@@ -464,7 +466,7 @@ def plot_sensitivity(
         
         # Plot line with error band
         ax.plot(param_values, means, 'o-', label=metric_name, linewidth=2, markersize=6)
-        ax.fill_between(param_values, ci_lowers, ci_uppers, alpha=0.2)
+        ax.fill_between(param_values, ci_lowers, ci_uppers, alpha=0.25)
         
         # Formatting - use display name if available
         display_name = METRIC_DISPLAY_NAMES.get(metric_name, metric_name.replace('_', ' ').title())

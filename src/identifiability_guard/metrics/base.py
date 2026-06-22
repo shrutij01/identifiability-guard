@@ -129,6 +129,34 @@ class BaseMetric(ABC):
         self._validate_result_range(result)
         return result
 
+    def compute_oos(
+        self,
+        Z_train: np.ndarray,
+        Z_hat_train: np.ndarray,
+        Z_test: np.ndarray,
+        Z_hat_test: np.ndarray,
+    ) -> MetricResult:
+        """
+        Compute the metric with out-of-sample evaluation.
+
+        Metrics that fit a model (e.g. R², InfoE) should override this to fit
+        on (Z_train, Z_hat_train) and evaluate on (Z_test, Z_hat_test).
+
+        The default implementation ignores the training data and calls
+        ``compute(Z_test, Z_hat_test)``, which is correct for pure-statistic
+        metrics (MCC, MIG, InfoM, InfoC) that do no model fitting.
+
+        Args:
+            Z_train: Ground-truth factors for fitting, shape (n_train, d).
+            Z_hat_train: Learned codes for fitting, shape (n_train, m).
+            Z_test: Ground-truth factors for evaluation, shape (n_test, d).
+            Z_hat_test: Learned codes for evaluation, shape (n_test, m).
+
+        Returns:
+            MetricResult scored on held-out test data.
+        """
+        return self.compute(Z_test, Z_hat_test)
+
     def compute_from_matrix(self, R: np.ndarray) -> MetricResult:
         """
         Compute the identifiability metric from a precomputed relationship matrix.
