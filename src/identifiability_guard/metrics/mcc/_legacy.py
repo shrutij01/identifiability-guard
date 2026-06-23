@@ -378,7 +378,8 @@ def mean_corr_coef_np(x, y, method="pearson", rng=None):
         raise ValueError("not a valid method: {}".format(method))
     cc = np.nan_to_num(cc, nan=0.0, posinf=0.0, neginf=0.0)
     cc = np.abs(cc)
-    score = cc[linear_sum_assignment(-1 * cc)].mean()
+    rows, cols = linear_sum_assignment(cc, maximize=True)
+    score = cc[rows, cols].mean()
     return float(np.clip(score, 0.0, 1.0))
 
 
