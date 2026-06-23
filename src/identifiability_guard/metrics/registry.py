@@ -234,6 +234,18 @@ class MetricRegistry:
             "mcc_spearman", MCCMetric, default_kwargs={"method": "spearman"}
         )
         self.register("mcc_rdc", MCCMetric, default_kwargs={"method": "rdc"})
+        self.register(
+            "mcc_pearson_crossfit", MCCMetric,
+            default_kwargs={"method": "pearson", "crossfit": True},
+        )
+        self.register(
+            "mcc_spearman_crossfit", MCCMetric,
+            default_kwargs={"method": "spearman", "crossfit": True},
+        )
+        self.register(
+            "mcc_pearson_coverage", MCCMetric,
+            default_kwargs={"method": "pearson", "normalization": "coverage"},
+        )
         self.register("r2", R2Metric)
         self.register("mig", MIGMetric, default_kwargs={"num_bins": 20})
         self.register(
