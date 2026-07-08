@@ -393,6 +393,13 @@ def plot_exp09():
 #   Heatmap grid:  one panel per metric
 #   rows = m/d,  cols = m/n,  colour = null-encoder score (should be 0)
 #   RdYlGn_r: green ≈ 0 (trustworthy), red > 0 (inflated)
+#
+#   Fixed-m design: m is held constant; rows vary d = m/(m/d) and columns
+#   vary n = m/(m/n), so the two ratio axes are independent knobs.
+#
+#   Collapse figure: null MCC-P over an (m, n) sweep at fixed d, plotted
+#   against m/n (no collapse) and against the extreme-value bound
+#   sqrt(2 log m / n_eff) (collapse), where n_eff is the test-split size.
 # ============================================================================
 
 
@@ -442,17 +449,77 @@ def _plot_phase_heatmap(grids, metrics, md_ratios, mn_ratios, encoder, stem):
 
 EXP15_MET_MAIN = ["mcc_pearson", "dci_disentanglement"]
 
+# Series colours for the collapse figure (one shade per m, MCC-P red family)
+EXP15_M_COLORS = ["#f1948a", "#c0392b", "#78281f"]
+EXP15_M_MARKERS = ["o", "s", "D"]
+
+
+def _plot_exp15_collapse(stem="exp15_mcc_collapse"):
+    """Two-panel collapse figure: null MCC-P vs m/n and vs the EVT bound."""
+    data, config = _try_load("exp15_collapse_e10")
+    if data is None:
+        print("  (no collapse results, skipping)")
+        return
+    grids = data.get("grids", data)
+    obs = np.asarray(grids["mcc_pearson_mean"])
+    m_values = config.get("m_values", [10, 50, 200])
+    n_values = np.asarray(config.get("n_values",
+                                     [20, 50, 100, 200, 500, 1000, 2000, 5000]),
+                          dtype=float)
+    # Pipeline scores pure-statistic metrics on the held-out 20% split
+    n_eff = n_values - (0.8 * n_values).astype(int)
+
+    fig, axes = plt.subplots(
+        1, 2,
+        figsize=(3.2 * 2 + 0.6, 2.4),
+        gridspec_kw={"wspace": 0.28,
+                     "left": 0.09, "right": 0.98,
+                     "top": 0.88, "bottom": 0.19},
+    )
+
+    for i, m in enumerate(m_values):
+        kw = dict(color=EXP15_M_COLORS[i % len(EXP15_M_COLORS)],
+                  marker=EXP15_M_MARKERS[i % len(EXP15_M_MARKERS)],
+                  lw=1.3, ms=3.2, label=f"$m={m}$")
+        axes[0].plot(m / n_values, obs[i], **kw)
+        axes[1].plot(np.sqrt(2 * np.log(m) / n_eff), obs[i], **kw)
+
+    xs = np.linspace(0, 1.75, 200)
+    axes[1].plot(xs, np.minimum(xs, 1.0), ls="--", lw=1.0, color="0.45",
+                 zorder=1, label=r"$\min(x,\,1)$")
+
+    axes[0].set_xscale("log")
+    axes[0].set_xlabel(r"$\mathbf{m\,/\,n}$", fontsize=11)
+    axes[0].set_title("no collapse in $m/n$", fontsize=10)
+    axes[1].set_xlabel(r"$\mathbf{\sqrt{2\log m \,/\, n_{\rm eff}}}$", fontsize=11)
+    axes[1].set_title(r"collapse in $\sqrt{2\log m / n_{\rm eff}}$", fontsize=10)
+    axes[0].set_ylabel("Null MCC-P score", fontsize=10)
+
+    for ax in axes:
+        _style_ax(ax)
+    axes[1].legend(frameon=True, fancybox=False, edgecolor="0.85",
+                   fontsize=7.5, loc="lower right", handletextpad=0.35)
+
+    _save(fig, stem)
+
 
 def plot_exp15():
-    """Phase diagram for E10 (main text only)."""
-    print("\n=== exp15: phase diagram (E10) ===")
-    grids, config = _load_exp15("exp15_e10")
-    if grids is None:
-        return
-    md_ratios = config.get("md_ratios", [0.5, 1.0, 2.0, 5.0, 10.0, 20.0])
-    mn_ratios = config.get("mn_ratios", [0.01, 0.05, 0.10, 0.50, 1.00, 5.00])
-    _plot_phase_heatmap(grids, EXP15_MET_MAIN, md_ratios, mn_ratios,
-                        "E10", "exp15_phase_diagram_e10_main")
+    """Phase diagrams (E10 main, E9 appendix) + MCC collapse figure."""
+    for enc_key, enc, stem in [
+        ("exp15_e10", "E10", "exp15_phase_diagram_e10_main"),
+        ("exp15_e9", "E9", "exp15_phase_diagram_e9_apx"),
+    ]:
+        print(f"\n=== exp15: phase diagram ({enc}) ===")
+        grids, config = _load_exp15(enc_key)
+        if grids is None:
+            continue
+        md_ratios = config.get("md_ratios", [0.5, 1.0, 2.0, 5.0, 10.0])
+        mn_ratios = config.get("mn_ratios", [0.01, 0.05, 0.10, 0.50, 1.00])
+        _plot_phase_heatmap(grids, EXP15_MET_MAIN, md_ratios, mn_ratios,
+                            enc, stem)
+
+    print("\n=== exp15: MCC collapse ===")
+    _plot_exp15_collapse()
 
 
 # ============================================================================
