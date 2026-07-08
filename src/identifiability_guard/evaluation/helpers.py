@@ -365,5 +365,9 @@ def create_encoder_with_params(
             encoder_kwargs['m'] = params['m']
     if encoder_name == 'E8' and 'codes_per_factor' in params:
         encoder_kwargs['codes_per_factor'] = params['codes_per_factor']
-    
+    if encoder_name == 'E9' and 'm' in params:
+        encoder_kwargs['m'] = params['m']
+    if encoder_name == 'E10' and 'm' in params:
+        encoder_kwargs['m'] = params['m']
+
     return encoder_cls(**encoder_kwargs)
