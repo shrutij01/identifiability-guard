@@ -1,0 +1,19 @@
+Date: Wed Jul  8 12:16:26 PM EDT 2026
+Hostname: cn-m003.server.mila.quebec
+CPUs: 8
+
+=== Step 1: Verification probe ===
+E10 with d=25, requested m=50 -> encoder.m = 50
+worst cell, 1 seed: 1799.4s
+{'dci_disentanglement': 0.032, 'infom': 0.059, 'mcc_pearson': 0.086, 'mcc_rdc': 0.952, 'mcc_spearman': 0.086, 'mig': 0.002, 'r2': 0.0, 'tmex': 0.9}
+PASS: probe complete
+
+=== Step 2: Full experiment ===
+======================================================================
+Experiment 15 – Phase diagram: metric reliability vs m/d × m/n
+  (m=50 fixed; rows vary d=[100, 50, 25, 10, 5], cols vary n=[5000, 1000, 500, 100, 50])
+======================================================================
+
+  ── Null encoder: E9 ──
+    m/d=0.5, m/n=0.01 → m=50, d=100, n=5000
+[2026-07-08T12:58:16.612] error: *** JOB 10073005 ON cn-m003 CANCELLED AT 2026-07-08T12:58:16 DUE to SIGNAL Terminated ***
