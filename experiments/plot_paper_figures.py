@@ -447,7 +447,7 @@ def _plot_phase_heatmap(grids, metrics, md_ratios, mn_ratios, encoder, stem):
     _save(fig, stem)
 
 
-EXP15_MET_MAIN = ["mcc_pearson", "dci_disentanglement"]
+EXP15_MET_MAIN = ["mcc_pearson", "dci_disentanglement", "mcc_rdc"]
 
 # Series colours for the collapse figure (one shade per m, MCC-P red family)
 EXP15_M_COLORS = ["#f1948a", "#c0392b", "#78281f"]
@@ -460,6 +460,7 @@ def _plot_exp15_collapse(stem="exp15_mcc_collapse"):
     if data is None:
         print("  (no collapse results, skipping)")
         return
+    config = config or {}  # results.npz can exist without its config.json sidecar
     grids = data.get("grids", data)
     obs = np.asarray(grids["mcc_pearson_mean"])
     m_values = config.get("m_values", [10, 50, 200])
@@ -512,6 +513,10 @@ def plot_exp15():
         print(f"\n=== exp15: phase diagram ({enc}) ===")
         grids, config = _load_exp15(enc_key)
         if grids is None:
+            continue
+        if not config or "m_fixed" not in config:
+            print(f"  ({enc_key} results predate the fixed-m redesign — "
+                  "stale, skipping; re-run exp15_phase_diagram.py)")
             continue
         md_ratios = config.get("md_ratios", [0.5, 1.0, 2.0, 5.0, 10.0])
         mn_ratios = config.get("mn_ratios", [0.01, 0.05, 0.10, 0.50, 1.00])
