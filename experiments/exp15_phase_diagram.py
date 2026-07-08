@@ -66,9 +66,9 @@ METRICS_MAIN = sorted(MAIN_METRICS)
 # Phase-diagram grid: m fixed, rows vary d, columns vary n
 M_FIXED = 50
 MD_RATIOS = [0.5, 1.0, 2.0, 5.0, 10.0]
-MN_RATIOS = [0.01, 0.05, 0.10, 0.50, 1.00]
+MN_RATIOS = [0.01, 0.05, 0.10, 0.50, 1.00, 2.00, 5.00]
 D_VALUES = [int(round(M_FIXED / md)) for md in MD_RATIOS]  # [100, 50, 25, 10, 5]
-N_VALUES = [int(round(M_FIXED / mn)) for mn in MN_RATIOS]  # [5000, 1000, 500, 100, 50]
+N_VALUES = [int(round(M_FIXED / mn)) for mn in MN_RATIOS]  # [5000, 1000, 500, 100, 50, 25, 10]
 
 # Collapse sweep: d fixed, m and n vary
 COLLAPSE_D = 10
