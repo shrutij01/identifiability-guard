@@ -307,7 +307,7 @@ def plot_collapse(collapse_grids, null_encoder="E10"):
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
-def main(plot_only=False, quick=False):
+def main(plot_only=False, quick=False, encoders=None):
     from results_io import save_results, load_results
 
     print("=" * 70)
@@ -315,7 +315,7 @@ def main(plot_only=False, quick=False):
     print(f"  (m={M_FIXED} fixed; rows vary d={D_VALUES}, cols vary n={N_VALUES})")
     print("=" * 70)
 
-    for enc in NULL_ENCODERS:
+    for enc in (encoders or NULL_ENCODERS):
         enc_lower = enc.lower()
         exp_key = f"exp15_{enc_lower}"
         collapse_key = f"exp15_collapse_{enc_lower}"
@@ -327,6 +327,10 @@ def main(plot_only=False, quick=False):
                 score_grids = data["grids"]
             except FileNotFoundError:
                 print(f"  No saved results for {exp_key}, skipping")
+                continue
+            if not config or "m_fixed" not in config:
+                print(f"  Saved {exp_key} results predate the fixed-m redesign "
+                      "(no 'm_fixed' in config) — stale axes, skipping. Re-run the sweep.")
                 continue
             try:
                 cdata, _ = load_results(collapse_key)
@@ -363,10 +367,11 @@ def main(plot_only=False, quick=False):
                 fig = plot_phase_diagram(score_grids, metrics=mets, null_encoder=enc)
                 savefig(fig, f"exp15_phase_diagram_{enc_lower}_{tag}.{ext}", subdir="exp15")
 
-        # 1×3 phase diagram
+        # 1×3 phase diagram ("_1x3": the "_main" name is taken by the
+        # METRICS_MAIN grid figure saved in the tags loop above)
         for ext in ("pdf", "png"):
             fig = plot_phase_diagram_main(score_grids, null_encoder=enc)
-            savefig(fig, f"exp15_phase_diagram_{enc_lower}_main.{ext}", subdir="exp15")
+            savefig(fig, f"exp15_phase_diagram_{enc_lower}_1x3.{ext}", subdir="exp15")
 
         # Single-metric figures for key metrics
         for met in ["mcc_pearson", "mcc_spearman", "dci_disentanglement", "r2", "tmex"]:
@@ -391,5 +396,9 @@ if __name__ == "__main__":
                         help="Load saved results and regenerate plots")
     parser.add_argument("--quick", action="store_true",
                         help="Quick sanity check: main plots only, skip sensitivity")
+    parser.add_argument("--encoders", nargs="+", choices=NULL_ENCODERS,
+                        default=None,
+                        help="Subset of null encoders to run (e.g. --encoders E10 "
+                             "to resume an interrupted sweep)")
     args = parser.parse_args()
-    main(plot_only=args.plot_only, quick=args.quick)
+    main(plot_only=args.plot_only, quick=args.quick, encoders=args.encoders)

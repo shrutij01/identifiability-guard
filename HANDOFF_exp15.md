@@ -1,5 +1,15 @@
 # Handoff: rerun Experiment 15 (null-encoder phase diagram) on the cluster
 
+> **Status 2026-07-08 (late)**: a high-effort code review of the diff passed
+> (8 findings — all fixed or deliberately deferred; compute path verified
+> bug-free), stale pre-fix results were archived to
+> `experiments/runs_old/exp15_stale_pre_m_fix/`, and a LOCAL run of the full
+> sweep may already be underway on the laptop. Before launching on the
+> cluster, check whether `experiments/runs/exp15_e10/` already exists locally.
+> Note: the 1×3 inspection figure is now saved as `..._1x3.{pdf,png}` (the
+> `_main` name belongs to the METRICS_MAIN grid figure), and both plotters
+> refuse results whose config lacks `m_fixed` (pre-redesign data).
+
 ## Goal
 Rerun `experiments/exp15_phase_diagram.py` after a redesign + bug fix, check the
 results against theory, and regenerate the paper figures. **CPU-only job — do
