@@ -79,11 +79,18 @@ print(f'worst cell, 1 seed: {t1-t0:.1f}s')
 print({k: round(v, 3) for k, v in sorted(res.items())})
 " 2>&1 | grep -v Warning | tail -5
 ```
-Pass criteria:
+Pass criteria (reference values measured on the laptop, 2026-07-08):
 - `encoder.m = 50` (if it prints 25, the helpers.py fix isn't on this checkout — stop).
-- Note the worst-cell time; full run ≈ that × 25 cells × 2 encoders (seeds run
-  5-way parallel, and most cells are much cheaper since cost is dominated by
-  n=5000 columns). If the projection is unreasonable, raise it before launching.
+- Scores for this cell: `mcc_pearson ≈ mcc_spearman ≈ 0.086` (theory:
+  √(2·ln 50/1000) = 0.0885), `r2 ≈ 0.0`, `mig ≈ 0.002`, `dci ≈ 0.03`,
+  `infom ≈ 0.06`. `mcc_rdc ≈ 0.96` and `tmex ≈ 0.96` are hugely inflated —
+  that is the expected failure story for those metrics, not a bug.
+- Timing: this worst cell took ~685 s for one seed on a laptop. Cells run
+  sequentially with the 5 seeds in parallel (`N_JOBS = 5`), and per-cell cost
+  drops roughly with n·d, so expect ~30 min/encoder for the phase grid +
+  a few min for the collapse sweep ⇒ ~1–1.5 h wall total.
+  `--cpus-per-task=8` is plenty (more cores won't help unless you also
+  parallelize across cells).
 
 ## Step 2 — full run
 ```bash
