@@ -426,11 +426,16 @@ def _plot_phase_heatmap(grids, metrics, md_ratios, mn_ratios, encoder, stem):
     row_labels = [f"{md:.0f}" if md >= 1 else f"{md:.1f}" for md in md_ratios]
     col_labels = [f"{mn:.2f}" for mn in mn_ratios]
 
+    # NaN = metric not computable at this operating point (its own
+    # min-sample guard refuses the test split) — render as light grey
+    cmap = plt.get_cmap("RdYlGn_r").copy()
+    cmap.set_bad("0.88")
+
     im = None
     for idx, met in enumerate(metrics):
         ax = axes[idx]
         grid = np.asarray(grids.get(met, np.full((len(md_ratios), len(mn_ratios)), np.nan)))
-        im = ax.imshow(grid, cmap="RdYlGn_r", aspect="auto", vmin=0, vmax=1)
+        im = ax.imshow(grid, cmap=cmap, aspect="auto", vmin=0, vmax=1)
         ax.set_xticks(range(len(col_labels)))
         ax.set_xticklabels(col_labels, fontweight="bold")
         ax.set_yticks(range(len(row_labels)))
@@ -447,7 +452,7 @@ def _plot_phase_heatmap(grids, metrics, md_ratios, mn_ratios, encoder, stem):
     _save(fig, stem)
 
 
-EXP15_MET_MAIN = ["mcc_pearson", "dci_disentanglement", "mcc_rdc"]
+EXP15_MET_MAIN = ["mcc_pearson", "dci_disentanglement"]
 
 # Series colours for the collapse figure (one shade per m, MCC-P red family)
 EXP15_M_COLORS = ["#f1948a", "#c0392b", "#78281f"]

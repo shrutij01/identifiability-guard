@@ -206,8 +206,8 @@ EXPERIMENTS = [
         "encoders": ["E9", "E10"],
         "m_values": [50],
         "md_ratios": [0.5, 1.0, 2.0, 5.0, 10.0],
-        "mn_ratios": [0.01, 0.05, 0.10, 0.50, 1.00],
-        "notes": "5x5 heatmap. m=50 FIXED; rows vary d = m/(m/d), cols vary "
+        "mn_ratios": [0.01, 0.05, 0.10, 0.50, 1.00, 2.00, 5.00],
+        "notes": "5x7 heatmap. m=50 FIXED; rows vary d = m/(m/d), cols vary "
                  "n = m/(m/n) — axes are independent knobs. Plus collapse "
                  "sweep: d=10, m in {10,50,200}, n in {20..5000}.",
     },
@@ -312,7 +312,7 @@ def print_ratio_table():
 def print_exp15_grid():
     """Print the full exp15 phase diagram grid (fixed-m design)."""
     md_ratios = [0.5, 1.0, 2.0, 5.0, 10.0]
-    mn_ratios = [0.01, 0.05, 0.10, 0.50, 1.00]
+    mn_ratios = [0.01, 0.05, 0.10, 0.50, 1.00, 2.00, 5.00]
     m = 50  # fixed; rows vary d, columns vary n
 
     print("\n\nExp15 Phase Diagram Grid (m=50 fixed, E9/E10 null encoders)")
