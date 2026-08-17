@@ -50,13 +50,19 @@ If you use this framework in your research, please cite:
 
 ```bibtex
 @software{identifiability_guard,
-  title = {Identifiability Guard: A Framework for Evaluating Identifiability Metrics},
-  author = {Identifiability Guard Team},
-  year = {2024},
-  url = {https://github.com/yourusername/identifiability-guard}
+  title = {Identifiability Guard},
+  author = {Joshi, Shruti and Saulus, Th\'eo and Brendel, Wieland and Brouillard, Philippe and Sridhar, Dhanya and Reizinger, Patrik},
+  year = {2026},
+  url = {https://github.com/shrutij01/identifiability-guard}
 }
 ```
 
+See the [paper](https://arxiv.org/abs/2602.24278) and the repository's
+[`CITATION.cff`](https://github.com/shrutij01/identifiability-guard/blob/main/CITATION.cff)
+for the preferred paper citation.
+
 ## License
 
-MIT License - see [LICENSE](../LICENSE) for details.
+MIT License - see
+[LICENSE](https://github.com/shrutij01/identifiability-guard/blob/main/LICENSE)
+for details.

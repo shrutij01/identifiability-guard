@@ -191,7 +191,7 @@ class MCCMetric(BaseMetric):
 
         Args:
             R: Absolute correlation matrix of shape (d, m). All entries
-               must be non-negative (apply np.abs before calling if needed).
+                must be non-negative (apply np.abs before calling if needed).
         """
         self._validate_matrix(R)
         if np.any(R < 0):

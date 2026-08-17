@@ -13,7 +13,7 @@ All metrics inherit from BaseMetric and return MetricResult objects.
 Use MetricRegistry for unified API across all metrics.
 
 Example:
-    >>> from src.metrics import MetricRegistry
+    >>> from identifiability_guard.metrics import MetricRegistry
     >>> registry = MetricRegistry()
     >>> registry.register_defaults()
     >>>

@@ -37,8 +37,9 @@ class E2ElementwiseNonlinear(BaseEncoder):
                 If None, uses a mix of default invertible functions.
             permute: Whether to apply a random permutation.
             nonlinearity_strength: Strength of nonlinearity in [0, 1].
-                0 = identity (linear), 1 = fully nonlinear.
-                Interpolates as: f(x) = (1-α)*x + α*h(x).
+                0 = elementwise linear, 1 = fully nonlinear.
+                Interpolates as: f(x) = (1-α)*a*x + α*h(x).
+            scale_range: Range for the non-zero linear scaling coefficients.
             seed: Optional random seed for reproducibility.
         """
         super().__init__(d=d, m=d, seed=seed)

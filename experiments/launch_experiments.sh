@@ -11,19 +11,19 @@
 #   bash experiments/launch_experiments.sh             # submit all
 #   bash experiments/launch_experiments.sh exp01       # submit one experiment
 #   bash experiments/launch_experiments.sh exp01 exp04 # submit several
-#   bash experiments/launch_experiments.sh fast        # submit a tier
+#   bash experiments/launch_experiments.sh medium      # submit a tier
 #   bash experiments/launch_experiments.sh heavy       # submit a tier
 #   bash experiments/launch_experiments.sh --quick             # all, quick sanity check
 #   bash experiments/launch_experiments.sh --quick exp01 exp04 # specific, quick
 
-# ---- Paths (edit these for your cluster) ----
-PROJECT_ROOT="/path/to/identifiability-guard"
-VENV_PATH="${PROJECT_ROOT}/.venv/bin/activate"
+# ---- Paths (override with environment variables when needed) ----
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+VENV_PATH="${VENV_PATH:-${PROJECT_ROOT}/.venv/bin/activate}"
 
 # ---- Job settings ----
-memory="8Gb"
-default_cpus=4
-partition="main"
+memory="${SLURM_MEMORY:-8G}"
+default_cpus="${SLURM_CPUS:-4}"
+partition="${SLURM_PARTITION:-main}"
 
 # ---- Setup directories ----
 mkdir -p "${PROJECT_ROOT}/experiments/generated_jobs"
@@ -52,10 +52,10 @@ submit_job() {
 
 module load python/3.9 2>/dev/null || true
 
-source ${VENV_PATH}
+source "${VENV_PATH}"
 
 export PYTHONPATH="${PROJECT_ROOT}:\$PYTHONPATH"
-cd ${PROJECT_ROOT}/experiments
+cd "${PROJECT_ROOT}/experiments"
 
 ${cmd}
 EOF
@@ -110,11 +110,10 @@ EXP_MODULE[exp14]="exp14_disentangle_ratios"
 EXP_MODULE[exp15]="exp15_phase_diagram"
 
 # Tier groupings
-FAST=""
 MEDIUM="exp01 exp02 exp03 exp05 exp15"
 HEAVY="exp04 exp06 exp07 exp08 exp09 exp11 exp12 exp13 exp14"
 LONG="exp10"
-ALL_EXPS="${FAST} ${MEDIUM} ${HEAVY} ${LONG}"
+ALL_EXPS="${MEDIUM} ${HEAVY} ${LONG}"
 
 # ---- Parse --quick flag ----
 QUICK_FLAG=""
@@ -131,7 +130,6 @@ set -- "${args[@]}"
 # ---- Determine which experiments to run ----
 resolve_targets() {
     case "$1" in
-        fast)   echo "${FAST}" ;;
         medium) echo "${MEDIUM}" ;;
         heavy)  echo "${HEAVY}" ;;
         long)   echo "${LONG}" ;;

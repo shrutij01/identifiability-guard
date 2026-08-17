@@ -187,25 +187,27 @@ bash experiments/launch_experiments.sh exp01
 # Submit multiple experiments
 bash experiments/launch_experiments.sh exp01 exp04 exp10
 
-# Submit by tier (fast / medium / heavy / long)
-bash experiments/launch_experiments.sh fast
+# Submit by tier (medium / heavy / long)
+bash experiments/launch_experiments.sh medium
 bash experiments/launch_experiments.sh heavy
 ```
 
-**Before first use**, edit the paths at the top of
-`experiments/launch_experiments.sh`:
+The launcher resolves the repository root relative to its own location and
+uses `.venv` by default. Override the paths or SLURM settings through
+environment variables when needed:
 ```bash
-PROJECT_ROOT="/path/to/identifiability-guard"
-VENV_PATH="${PROJECT_ROOT}/.venv/bin/activate"
+PROJECT_ROOT=/path/to/identifiability-guard \
+VENV_PATH=/path/to/venv/bin/activate \
+SLURM_PARTITION=compute \
+bash experiments/launch_experiments.sh exp01
 ```
 
 Tier time limits:
 | Tier   | Time  | Experiments                           |
 |--------|-------|---------------------------------------|
-| fast   | 1 h   | exp01, exp12                          |
-| medium | 2 h   | exp02, exp03, exp05, exp08, exp09     |
-| heavy  | 3 h   | exp04, exp06, exp07, exp11, exp13, exp14 |
-| long   | 4 h   | exp10                                 |
+| medium | 2–3 h | exp01, exp02, exp03, exp05, exp15     |
+| heavy  | 3–5 h | exp04, exp06–exp09, exp11–exp14       |
+| long   | 5–6 h | exp10                                 |
 
 Generated job scripts are in `experiments/generated_jobs/`.
 Logs are written to `experiments/logs/`.

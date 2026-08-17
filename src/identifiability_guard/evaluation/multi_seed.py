@@ -146,7 +146,8 @@ def compute_statistics(
     Example:
         >>> values = [0.85, 0.87, 0.83, 0.86, 0.84]
         >>> stats = compute_statistics(values)
-        >>> print(f"Mean: {stats['mean']:.3f} ± {stats['std']:.3f}")
+        >>> round(stats.get("mean"), 3)
+        0.85
     """
     values_array = np.array(values)
     
@@ -214,7 +215,8 @@ def aggregate_results(
     Example:
         >>> results = {"mcc": [0.85, 0.87, 0.83], "dci": [0.92, 0.91, 0.93]}
         >>> aggregated = aggregate_results(results)
-        >>> print(f"MCC: {aggregated['mcc']['mean']:.3f} ± {aggregated['mcc']['std']:.3f}")
+        >>> len(aggregated)
+        2
     """
     aggregated = {}
     
@@ -254,7 +256,8 @@ def run_multi_seed_evaluation(
         ...     # ... evaluation code ...
         ...     return {"mcc": score}
         >>> raw, agg = run_multi_seed_evaluation(eval_fn, n_seeds=5)
-        >>> print(f"MCC: {agg['mcc']['mean']:.3f} ± {agg['mcc']['std']:.3f}")
+        >>> len(raw), len(agg)
+        (1, 1)
     """
     # Generate seeds
     seeds = [base_seed + i for i in range(n_seeds)]

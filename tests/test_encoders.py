@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.encoders import (
+from identifiability_guard.encoders import (
     E1ElementwiseLinear,
     E2ElementwiseNonlinear,
     E3LinearlyEntangled,
@@ -99,13 +99,12 @@ class TestE2ElementwiseNonlinear:
         np.testing.assert_array_almost_equal(Z_hat, expected)
     
     def test_nonlinearity_strength_zero(self):
-        """Test that nonlinearity_strength=0 gives identity transformation."""
+        """Test that nonlinearity_strength=0 gives an elementwise linear map."""
         encoder = E2ElementwiseNonlinear(d=3, nonlinearity_strength=0.0, permute=False, seed=42)
         Z = np.random.randn(50, 3)
         Z_hat = encoder.encode(Z)
         
-        # With strength=0, should be identity (no nonlinearity)
-        np.testing.assert_array_almost_equal(Z, Z_hat)
+        np.testing.assert_array_almost_equal(Z * encoder.scales, Z_hat)
     
     def test_nonlinearity_strength_one(self):
         """Test that nonlinearity_strength=1 gives full nonlinearity."""
@@ -129,8 +128,8 @@ class TestE2ElementwiseNonlinear:
         Z = np.array([[2.0]])
         Z_hat = encoder.encode(Z)
         
-        # f(x) = (1-0.5)*x + 0.5*x^2 = 0.5*2 + 0.5*4 = 1 + 2 = 3
-        expected = np.array([[3.0]])
+        # f(x) = (1-alpha)*a*x + alpha*h(x)
+        expected = 0.5 * encoder.scales * Z + 0.5 * Z**2
         np.testing.assert_array_almost_equal(Z_hat, expected)
     
     def test_nonlinearity_strength_validation(self):

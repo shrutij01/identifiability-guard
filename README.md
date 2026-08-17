@@ -1,6 +1,8 @@
 # Identifiability Guard
 
-Benchmark framework for testing identifiability metrics. Generate controlled ground-truth factors, mix them in specific ways, measure how well metrics detect recovery.
+Benchmark framework for stress-testing identifiability metrics. Generate controlled ground-truth factors, transform them in specific ways, and measure whether standard metrics correctly detect recovery.
+
+Companion code for [*Who Guards the Guardians? The Challenges of Evaluating Identifiability of Learned Representations*](https://arxiv.org/abs/2602.24278).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -16,7 +18,7 @@ Three pieces: generate latent factors Z with known structure → apply systemati
 ## Install
 
 ```bash
-# Fast path (uv is 10-100x faster than pip)
+# With uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv && source .venv/bin/activate
 uv pip install -e .
@@ -137,12 +139,14 @@ docs/            # Documentation
 ```bibtex
 @software{identifiability_guard,
   title = {Identifiability Guard},
-  author = {Identifiability Guard Team},
-  year = {2024},
+  author = {Joshi, Shruti and Saulus, Th\'eo and Brendel, Wieland and Brouillard, Philippe and Sridhar, Dhanya and Reizinger, Patrik},
+  year = {2026},
   url = {https://github.com/shrutij01/identifiability-guard}
 }
 ```
 
+For the accompanying paper citation, see [`CITATION.cff`](CITATION.cff).
+
 ## License
 
-MIT
+[MIT](LICENSE)

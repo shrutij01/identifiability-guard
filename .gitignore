@@ -118,3 +118,13 @@ context_*
 AUDIT.md
 experiments/logs
 experiments/generated_jobs
+
+# Local experiment artifacts and internal drafts
+runs/
+experiments/runs_old/
+artifacts/
+*.backup
+HANDOFF_*.md
+uai-review*
+uai-rebuttal.md
+experiments/*-expts.md

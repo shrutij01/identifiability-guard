@@ -2,7 +2,7 @@
 
 ## Quick Install
 
-Use `uv` (10-100x faster than pip):
+Using `uv`:
 
 ```bash
 # Install uv

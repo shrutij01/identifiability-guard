@@ -9,12 +9,14 @@ import time
 import tracemalloc
 from contextlib import contextmanager
 from functools import wraps
-from typing import Callable, Dict, Optional, Any, Tuple
+from typing import Callable, Dict, Optional, Any, Tuple, Iterator
 import sys
 
 
 @contextmanager
-def time_block(name: str = "Block", verbose: bool = True):
+def time_block(
+    name: str = "Block", verbose: bool = True
+) -> Iterator[Dict[str, float]]:
     """
     Context manager for timing a code block.
     
@@ -23,7 +25,7 @@ def time_block(name: str = "Block", verbose: bool = True):
         verbose: If True, prints timing information.
         
     Yields:
-        dict: Dictionary to store timing results with key 'elapsed'.
+        result: Dictionary to store timing results with key ``elapsed``.
         
     Example:
         >>> with time_block("Data generation") as timer:
@@ -43,7 +45,9 @@ def time_block(name: str = "Block", verbose: bool = True):
 
 
 @contextmanager
-def memory_profiler(name: str = "Block", verbose: bool = True):
+def memory_profiler(
+    name: str = "Block", verbose: bool = True
+) -> Iterator[Dict[str, float]]:
     """
     Context manager for profiling memory usage of a code block.
     
@@ -54,7 +58,7 @@ def memory_profiler(name: str = "Block", verbose: bool = True):
         verbose: If True, prints memory usage information.
         
     Yields:
-        dict: Dictionary with keys 'current', 'peak' (in MB).
+        result: Dictionary with keys ``current`` and ``peak`` (in MB).
         
     Example:
         >>> with memory_profiler("Model training") as mem:
@@ -85,7 +89,9 @@ def memory_profiler(name: str = "Block", verbose: bool = True):
 
 
 @contextmanager
-def profile_block(name: str = "Block", verbose: bool = True):
+def profile_block(
+    name: str = "Block", verbose: bool = True
+) -> Iterator[Dict[str, float]]:
     """
     Context manager for combined timing and memory profiling.
     
@@ -94,7 +100,8 @@ def profile_block(name: str = "Block", verbose: bool = True):
         verbose: If True, prints timing and memory information.
         
     Yields:
-        dict: Dictionary with keys 'elapsed', 'current_mb', 'peak_mb'.
+        result: Dictionary with keys ``elapsed``, ``current_mb``, and
+            ``peak_mb``.
         
     Example:
         >>> with profile_block("Full evaluation") as profile:

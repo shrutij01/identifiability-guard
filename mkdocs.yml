@@ -1,6 +1,6 @@
 site_name: Identifiability Guard
 site_description: A framework for evaluating identifiability metrics in representation learning
-site_author: Identifiability Guard Team
+site_author: Identifiability Guard contributors
 repo_url: https://github.com/shrutij01/identifiability-guard
 repo_name: identifiability-guard
 
@@ -70,7 +70,6 @@ markdown_extensions:
       permalink: true
 
 extra_javascript:
-  - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 extra_css:
@@ -81,12 +80,6 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/shrutij01/identifiability-guard
       name: GitHub Repository
-    - icon: fontawesome/brands/python
-      link: https://pypi.org/project/identifiability-guard/
-      name: PyPI Package
-  analytics:
-    provider: google
-    property: G-XXXXXXXXXX  # Replace with your GA4 ID
 
 nav:
   - Home: index.md

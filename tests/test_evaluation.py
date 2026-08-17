@@ -7,14 +7,14 @@ from pathlib import Path
 import tempfile
 import json
 
-from src.evaluation.timing import time_block, Timer, memory_profiler
-from src.evaluation.multi_seed import (
+from identifiability_guard.evaluation.timing import time_block, Timer, memory_profiler
+from identifiability_guard.evaluation.multi_seed import (
     run_with_seeds,
     compute_statistics,
     aggregate_results,
     run_multi_seed_evaluation,
 )
-from src.evaluation.sensitivity import (
+from identifiability_guard.evaluation.sensitivity import (
     parameter_sweep,
     sensitivity_analysis_1d,
     compute_sensitivity_statistics,

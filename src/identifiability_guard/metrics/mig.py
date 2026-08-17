@@ -222,7 +222,7 @@ class MIGMetric(BaseMetric):
 
         Args:
             R: MI matrix of shape (num_factors, num_codes) where R[j, i] is
-               the mutual information between factor j and code i.
+                the mutual information between factor j and code i.
 
         Returns:
             MetricResult with MIG score.

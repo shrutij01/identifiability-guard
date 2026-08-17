@@ -1,6 +1,6 @@
 """Metric registry for unified API across all metrics."""
 
-from typing import Dict, Type, Optional, List
+from typing import Any, Dict, Type, Optional, List
 import numpy as np
 import warnings
 
@@ -15,7 +15,7 @@ class MetricRegistry:
     interface regardless of implementation source (internal, DisentanglementLib, etc.).
 
     Example:
-        >>> from src.metrics import MetricRegistry
+        >>> from identifiability_guard.metrics import MetricRegistry
         >>> registry = MetricRegistry()
         >>>
         >>> # Register metrics
@@ -94,13 +94,13 @@ class MetricRegistry:
         del self._default_kwargs[normalized]
         del self._display_names[normalized]
 
-    def create(self, name: str, **kwargs) -> BaseMetric:
+    def create(self, name: str, **kwargs: Any) -> BaseMetric:
         """
         Instantiate a metric by name.
 
         Args:
             name: Name of the registered metric.
-            **kwargs: Keyword arguments to override defaults.
+            kwargs: Keyword arguments to override defaults.
 
         Returns:
             Instantiated metric.

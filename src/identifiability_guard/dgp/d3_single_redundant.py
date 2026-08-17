@@ -72,7 +72,7 @@ class D3SingleRedundant(BaseDGP):
             
         Returns:
             Z: Array of shape (n, d) where Z[:, 1:1+r] = f_i(Z[:, 0]) + noise,
-               and remaining columns are independent sources.
+                and remaining columns are independent sources.
         """
         if n < 1:
             raise ValueError("n must be at least 1")

@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.dgp import (
+from identifiability_guard.dgp import (
     D1Independent, 
     D2Correlated, 
     D3SingleRedundant, 

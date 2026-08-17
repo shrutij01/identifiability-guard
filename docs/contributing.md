@@ -4,7 +4,7 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/identifiability-guard.git
+git clone https://github.com/shrutij01/identifiability-guard.git
 cd identifiability-guard
 
 # Install with development dependencies
@@ -63,7 +63,7 @@ mypy src/
 pytest
 
 # With coverage
-pytest --cov=src --cov-report=html
+pytest --cov=identifiability_guard --cov-report=html
 
 # Specific test file
 pytest tests/test_metrics.py
@@ -82,13 +82,19 @@ pytest -v
 
 ```python
 from .base import BaseDGP
+from typing import Optional
 import numpy as np
 
 class D5MyNewDGP(BaseDGP):
     """Description of the DGP."""
 
-    def __init__(self, d: int, my_param: float = 1.0, seed: int | None = None):
-        super().__init__(d, seed)
+    def __init__(
+        self,
+        d: int,
+        my_param: float = 1.0,
+        seed: Optional[int] = None,
+    ):
+        super().__init__(d=d, seed=seed)
         self.my_param = my_param
 
     def sample(self, n_samples: int) -> np.ndarray:
@@ -101,8 +107,7 @@ class D5MyNewDGP(BaseDGP):
         Returns:
             Array of shape (n_samples, d)
         """
-        # Implementation here
-        return Z
+        raise NotImplementedError
 ```
 
 4. Add to `src/identifiability_guard/dgp/__init__.py`:
@@ -126,15 +131,23 @@ __all__ = [
 
 ```python
 from .base import BaseEncoder
+from typing import Optional
 import numpy as np
 
 class E11MyNewEncoder(BaseEncoder):
     """Description of the encoder."""
 
-    def __init__(self, d: int, m: int | None = None, seed: int | None = None):
-        super().__init__(d, seed)
-        self.m = m if m is not None else d
-        # Initialize parameters
+    def __init__(
+        self,
+        d: int,
+        m: Optional[int] = None,
+        seed: Optional[int] = None,
+    ):
+        super().__init__(d=d, m=m, seed=seed)
+
+    def _initialize_parameters(self) -> None:
+        """Initialize parameters used by the transformation."""
+        self._initialized = True
 
     def encode(self, Z: np.ndarray) -> np.ndarray:
         """
@@ -146,8 +159,7 @@ class E11MyNewEncoder(BaseEncoder):
         Returns:
             Encoded representations of shape (n_samples, m)
         """
-        # Implementation here
-        return Z_hat
+        raise NotImplementedError
 ```
 
 4. Add to `src/identifiability_guard/encoders/__init__.py`
@@ -157,7 +169,8 @@ class E11MyNewEncoder(BaseEncoder):
 
 1. Create file in `src/identifiability_guard/metrics/`
 2. Inherit from `BaseMetric`
-3. Implement `compute()` method returning `MetricResult`
+3. Implement `_compute_impl()` returning `MetricResult`; `BaseMetric.compute()`
+   handles input and output validation
 
 ```python
 from .base import BaseMetric, MetricResult
@@ -169,7 +182,7 @@ class MyNewMetric(BaseMetric):
     def __init__(self, param: float = 1.0):
         self.param = param
 
-    def compute(self, Z: np.ndarray, Z_hat: np.ndarray) -> MetricResult:
+    def _compute_impl(self, Z: np.ndarray, Z_hat: np.ndarray) -> MetricResult:
         """
         Compute metric.
 
@@ -180,16 +193,7 @@ class MyNewMetric(BaseMetric):
         Returns:
             MetricResult with primary_score, subscores, metadata
         """
-        # Implementation here
-        primary_score = ...
-        subscores = {"subscore1": ..., "subscore2": ...}
-        metadata = {"info": ...}
-
-        return MetricResult(
-            primary_score=primary_score,
-            subscores=subscores,
-            metadata=metadata,
-        )
+        raise NotImplementedError
 ```
 
 4. Add to `src/identifiability_guard/metrics/__init__.py`
@@ -399,4 +403,3 @@ When reporting bugs, include:
 
 - Open an issue for bugs or feature requests
 - Start a discussion for questions or ideas
-- Email maintainers for private concerns

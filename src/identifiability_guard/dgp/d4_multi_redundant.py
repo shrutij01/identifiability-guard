@@ -33,8 +33,9 @@ class D4MultiRedundant(BaseDGP):
         Args:
             d: Number of latent factors (must be >= 3).
             r: Number of redundant factors (defaults to sqrt(d)).
-            redundant_fn: Function $g:\mathbb{R}^{d-r} \to \mathbb{R}^r$ that maps $d-r$ source factors to the $r$
-                redundant factor. Defaults to $g_{d-r+i}(x_1, \ldots, x_{d-r}) = x_i * \sum_{j \neq i} x_j$.
+            redundant_fns: One bivariate function or a list of ``r``
+                bivariate functions used to construct the redundant factors.
+                Defaults to a cycle of nonlinear bivariate functions.
             noise_std: Standard deviation of optional noise added to the
                 redundant factor. Default is 0 (deterministic).
             seed: Optional random seed for reproducibility.
@@ -86,7 +87,7 @@ class D4MultiRedundant(BaseDGP):
             
         Returns:
             Z: Array of shape (n, d) where Z[:, 2:2+r] = g_i(Z[:, 0], Z[:, 1]) + noise,
-               and remaining columns are independent sources.
+                and remaining columns are independent sources.
         """
         if n < 1:
             raise ValueError("n must be at least 1")

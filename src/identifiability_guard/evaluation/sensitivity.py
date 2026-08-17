@@ -217,11 +217,12 @@ def compute_sensitivity_statistics(
     Example:
         >>> values, results = sensitivity_analysis_1d(...)
         >>> stats = compute_sensitivity_statistics(values, results)
+        >>> mcc_stats = stats.get("mcc")
         >>> import matplotlib.pyplot as plt
-        >>> plt.plot(stats['mcc']['values'], stats['mcc']['mean'])
-        >>> plt.fill_between(stats['mcc']['values'], 
-        ...                  stats['mcc']['ci_lower'], 
-        ...                  stats['mcc']['ci_upper'], 
+        >>> plt.plot(mcc_stats.get("values"), mcc_stats.get("mean"))
+        >>> plt.fill_between(mcc_stats.get("values"),
+        ...                  mcc_stats.get("ci_lower"),
+        ...                  mcc_stats.get("ci_upper"),
         ...                  alpha=0.3)
     """
     from scipy import stats as scipy_stats

@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the accompanying paper."
+title: "Identifiability Guard"
+type: software
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/shrutij01/identifiability-guard"
+url: "https://arxiv.org/abs/2602.24278"
+authors:
+  - family-names: Joshi
+    given-names: Shruti
+  - family-names: Saulus
+    given-names: Théo
+  - family-names: Brendel
+    given-names: Wieland
+  - family-names: Brouillard
+    given-names: Philippe
+  - family-names: Sridhar
+    given-names: Dhanya
+  - family-names: Reizinger
+    given-names: Patrik
+preferred-citation:
+  type: article
+  title: "Who Guards the Guardians? The Challenges of Evaluating Identifiability of Learned Representations"
+  authors:
+    - family-names: Joshi
+      given-names: Shruti
+    - family-names: Saulus
+      given-names: Théo
+    - family-names: Brendel
+      given-names: Wieland
+    - family-names: Brouillard
+      given-names: Philippe
+    - family-names: Sridhar
+      given-names: Dhanya
+    - family-names: Reizinger
+      given-names: Patrik
+  year: 2026
+  url: "https://arxiv.org/abs/2602.24278"

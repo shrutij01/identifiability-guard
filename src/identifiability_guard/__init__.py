@@ -3,8 +3,8 @@ Identifiability Guard: A framework for evaluating identifiability metrics.
 
 This package provides:
 - Data Generating Processes (DGPs): D1-D4
-- Encoder Mixings: E1-E6
-- Identifiability Metrics: MCC, DCI
+- Encoder Mixings: E1-E10
+- Identifiability Metrics: MCC, DCI, R², MIG, T-MEX, and InfoMEC
 """
 
 from . import dgp

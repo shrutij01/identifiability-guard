@@ -16,6 +16,7 @@ except ImportError:
     HAS_TORCH = False
 
 from identifiability_guard.metrics import (
+    MetricResult,
     MCC,
     DCI,
     MIG,
@@ -379,11 +380,12 @@ class TestDCI:
         Z_hat = Z.copy()
 
         dci = DCI()
-        scores = dci.compute(Z, Z_hat)
+        result = dci.compute(Z, Z_hat)
 
-        assert "disentanglement" in scores
-        assert "completeness" in scores
-        assert "informativeness" in scores
+        assert "disentanglement" in result.subscores
+        assert "completeness" in result.subscores
+        assert "informativeness_train" in result.subscores
+        assert "informativeness_test" in result.subscores
 
     def test_perfect_disentanglement(self):
         """Test high scores for perfect encoding."""
@@ -392,12 +394,12 @@ class TestDCI:
         Z_hat = Z.copy()
 
         dci = DCI()
-        scores = dci.compute(Z, Z_hat)
+        result = dci.compute(Z, Z_hat)
 
         # Perfect encoding should have high scores
-        assert scores["disentanglement"] > 0.8
-        assert scores["completeness"] > 0.8
-        assert scores["informativeness"] > 0.9
+        assert result.subscores["disentanglement"] > 0.8
+        assert result.subscores["completeness"] > 0.8
+        assert result.subscores["informativeness_test"] > 0.9
 
     def test_entangled_representation(self):
         """Test lower disentanglement for entangled codes."""
@@ -408,10 +410,10 @@ class TestDCI:
         Z_hat = Z @ A.T
 
         dci = DCI()
-        scores = dci.compute(Z, Z_hat)
+        result = dci.compute(Z, Z_hat)
 
         # Entangled should have lower disentanglement
-        assert scores["disentanglement"] < 0.8
+        assert result.subscores["disentanglement"] < 0.8
 
     def test_scores_in_range(self):
         """Test that all scores are in [0, 1]."""
@@ -420,21 +422,20 @@ class TestDCI:
         Z_hat = np.random.randn(500, 3)
 
         dci = DCI()
-        scores = dci.compute(Z, Z_hat)
+        result = dci.compute(Z, Z_hat)
 
-        for name, score in scores.items():
+        for name, score in result.subscores.items():
             assert 0 <= score <= 1, f"{name} = {score} not in [0, 1]"
 
-    def test_gradient_boosting_method(self):
-        """Test DCI with gradient boosting method."""
+    def test_gradient_boosting_computation(self):
+        """Test the gradient-boosting DCI implementation."""
         np.random.seed(42)
         Z = np.random.randn(200, 3)
         Z_hat = Z.copy()
 
-        dci = DCI(method="gradient_boosting", n_estimators=50)
-        scores = dci.compute(Z, Z_hat)
+        result = DCI(random_state=42).compute(Z, Z_hat)
 
-        assert scores["informativeness"] > 0.8
+        assert result.subscores["informativeness_test"] > 0.8
 
     def test_too_few_samples(self):
         """Test that too few samples raises error."""
@@ -445,10 +446,10 @@ class TestDCI:
         with pytest.raises(ValueError):
             dci.compute(Z, Z_hat)
 
-    def test_invalid_method(self):
-        """Test that invalid method raises error."""
+    def test_invalid_train_test_split(self):
+        """Test that an invalid train/test split raises an error."""
         with pytest.raises(ValueError):
-            DCI(method="invalid")
+            DCI(train_test_split=1.0)
 
     def test_callable(self):
         """Test metric is callable."""
@@ -457,8 +458,8 @@ class TestDCI:
         Z_hat = Z.copy()
 
         dci = DCI()
-        scores = dci(Z, Z_hat)
-        assert isinstance(scores, dict)
+        result = dci(Z, Z_hat)
+        assert isinstance(result, MetricResult)
 
 
 class TestInfoMECVectorization:

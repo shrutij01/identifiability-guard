@@ -38,6 +38,7 @@ def compute_importance_gbt(
     x_test,
     y_test,
     discrete_factors=None,
+    random_state=None,
 ):
     """Compute importance based on gradient boosted trees.
 
@@ -53,6 +54,7 @@ def compute_importance_gbt(
         discrete_factors: Optional list of bools indicating which factors are discrete.
             If None, auto-detects: factors with integer-like values are discrete,
             otherwise continuous.
+        random_state: Optional seed passed to every gradient-boosting estimator.
 
     Returns:
         importance_matrix: Array of shape (num_codes, num_factors).
@@ -78,7 +80,7 @@ def compute_importance_gbt(
 
         if is_discrete:
             # Use classifier for discrete factors
-            model = ensemble.GradientBoostingClassifier()
+            model = ensemble.GradientBoostingClassifier(random_state=random_state)
             try:
                 model.fit(x_train.T, y_train[i, :])
             except ValueError as e:
@@ -99,7 +101,7 @@ def compute_importance_gbt(
             )
         else:
             # Use regressor for continuous factors
-            model = ensemble.GradientBoostingRegressor()
+            model = ensemble.GradientBoostingRegressor(random_state=random_state)
             model.fit(x_train.T, y_train[i, :])
             importance_matrix[:, i] = np.abs(model.feature_importances_)
             # Informativeness = R² score
@@ -235,6 +237,7 @@ class DCIMetric(BaseMetric):
             mus_test,
             ys_test,
             discrete_factors=self.discrete_factors,
+            random_state=self.random_state,
         )
 
         disent = float(disentanglement(importance_matrix))

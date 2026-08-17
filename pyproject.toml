@@ -10,7 +10,12 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Identifiability Guard Team"}
+    {name = "Shruti Joshi"},
+    {name = "Théo Saulus"},
+    {name = "Wieland Brendel"},
+    {name = "Philippe Brouillard"},
+    {name = "Dhanya Sridhar"},
+    {name = "Patrik Reizinger"},
 ]
 keywords = ["identifiability", "representation learning", "disentanglement", "metrics"]
 classifiers = [
@@ -31,6 +36,11 @@ dependencies = [
     "scikit-learn>=1.0.1",
     "matplotlib>=3.5.0",
 ]
+
+[project.urls]
+Paper = "https://arxiv.org/abs/2602.24278"
+Repository = "https://github.com/shrutij01/identifiability-guard"
+Documentation = "https://shrutij01.github.io/identifiability-guard/"
 
 [project.optional-dependencies]
 dev = [
