@@ -386,9 +386,7 @@ def mean_corr_coef_np(x, y, method="pearson", rng=None):
 def mean_corr_coef(x, y, method="pearson", rng=None):
     """Dispatcher: selects NumPy or PyTorch MCC based on input type."""
     if type(x) != type(y):
-        raise ValueError(
-            f"inputs are of different types: ({type(x)}, {type(y)})"
-        )
+        raise ValueError(f"inputs are of different types: ({type(x)}, {type(y)})")
     if isinstance(x, np.ndarray):
         return mean_corr_coef_np(x, y, method, rng=rng)
     elif HAS_TORCH and isinstance(x, torch.Tensor):

@@ -90,14 +90,17 @@ class MCCMetric(BaseMetric):
 
         if self.crossfit:
             cf = mean_corr_coef_crossfit_np(
-                Z, Z_hat,
+                Z,
+                Z_hat,
                 method=self.method,
                 n_splits=self.n_splits,
                 seed=self.seed if self.seed is not None else 0,
                 coverage_aware=False,
             )
             matched_score = float(np.clip(cf.score, 0.0, 1.0))
-            coverage_score = float(np.clip(matched_score * k / d, 0.0, 1.0)) if d > 0 else 0.0
+            coverage_score = (
+                float(np.clip(matched_score * k / d, 0.0, 1.0)) if d > 0 else 0.0
+            )
             extra_meta = {
                 "fold_scores": cf.fold_scores.tolist(),
                 "n_splits": self.n_splits,
@@ -109,7 +112,9 @@ class MCCMetric(BaseMetric):
             if not np.isfinite(matched_score):
                 matched_score = 0.0
             matched_score = float(np.clip(matched_score, 0.0, 1.0))
-            coverage_score = float(np.clip(matched_score * k / d, 0.0, 1.0)) if d > 0 else 0.0
+            coverage_score = (
+                float(np.clip(matched_score * k / d, 0.0, 1.0)) if d > 0 else 0.0
+            )
             extra_meta = {}
 
         primary = coverage_score if self.normalization == "coverage" else matched_score
@@ -153,11 +158,17 @@ class MCCMetric(BaseMetric):
         k = min(d, m)
 
         score, _, _ = mcc_train_test_np(
-            Z_train, Z_hat_train, Z_test, Z_hat_test,
-            method=self.method, coverage_aware=False,
+            Z_train,
+            Z_hat_train,
+            Z_test,
+            Z_hat_test,
+            method=self.method,
+            coverage_aware=False,
         )
         matched_score = float(np.clip(score, 0.0, 1.0))
-        coverage_score = float(np.clip(matched_score * k / d, 0.0, 1.0)) if d > 0 else 0.0
+        coverage_score = (
+            float(np.clip(matched_score * k / d, 0.0, 1.0)) if d > 0 else 0.0
+        )
         primary = coverage_score if self.normalization == "coverage" else matched_score
 
         result = self.make_result(
@@ -194,7 +205,9 @@ class MCCMetric(BaseMetric):
         k = len(row_ind)
 
         matched_score = float(np.clip(R[row_ind, col_ind].mean(), 0.0, 1.0))
-        coverage_score = float(np.clip(matched_score * k / d, 0.0, 1.0)) if d > 0 else 0.0
+        coverage_score = (
+            float(np.clip(matched_score * k / d, 0.0, 1.0)) if d > 0 else 0.0
+        )
         primary = coverage_score if self.normalization == "coverage" else matched_score
 
         return self.make_result(

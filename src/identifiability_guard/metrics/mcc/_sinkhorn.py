@@ -33,8 +33,16 @@ def sinkhorn_rectangular_plan_pt(
         raise ImportError("PyTorch is required for Sinkhorn")
     if affinity.ndim != 2 or affinity.numel() == 0:
         raise ValueError("affinity must be a non-empty 2-D tensor")
+    if not torch.isfinite(affinity).all():
+        raise ValueError("affinity must contain only finite values")
     if temperature <= 0:
         raise ValueError("temperature must be positive")
+    if isinstance(max_iter, bool) or not isinstance(max_iter, int):
+        raise TypeError("max_iter must be an integer")
+    if max_iter < 1:
+        raise ValueError("max_iter must be at least 1")
+    if tol <= 0:
+        raise ValueError("tol must be positive")
 
     s = affinity.to(dtype=torch.float32)
     d, m = s.shape
@@ -44,18 +52,22 @@ def sinkhorn_rectangular_plan_pt(
 
     if d < m:
         aug = torch.cat([s, torch.zeros((1, m), device=device, dtype=dtype)], dim=0)
-        a = torch.cat([
-            torch.full((d,), 1.0 / q, device=device, dtype=dtype),
-            torch.tensor([(m - d) / q], device=device, dtype=dtype),
-        ])
+        a = torch.cat(
+            [
+                torch.full((d,), 1.0 / q, device=device, dtype=dtype),
+                torch.tensor([(m - d) / q], device=device, dtype=dtype),
+            ]
+        )
         b = torch.full((m,), 1.0 / q, device=device, dtype=dtype)
     elif d > m:
         aug = torch.cat([s, torch.zeros((d, 1), device=device, dtype=dtype)], dim=1)
         a = torch.full((d,), 1.0 / q, device=device, dtype=dtype)
-        b = torch.cat([
-            torch.full((m,), 1.0 / q, device=device, dtype=dtype),
-            torch.tensor([(d - m) / q], device=device, dtype=dtype),
-        ])
+        b = torch.cat(
+            [
+                torch.full((m,), 1.0 / q, device=device, dtype=dtype),
+                torch.tensor([(d - m) / q], device=device, dtype=dtype),
+            ]
+        )
     else:
         aug = s
         a = torch.full((d,), 1.0 / q, device=device, dtype=dtype)
@@ -96,9 +108,14 @@ def sinkhorn_soft_mcc_pt(
     """
     if torch is None:
         raise ImportError("PyTorch is required for Sinkhorn")
+    if r_test is not None and r_test.shape != r_train.shape:
+        raise ValueError("r_train and r_test must have the same shape")
 
     plan, legacy_scale, residual, iterations = sinkhorn_rectangular_plan_pt(
-        torch.abs(r_train), temperature=temperature, max_iter=max_iter, tol=tol,
+        torch.abs(r_train),
+        temperature=temperature,
+        max_iter=max_iter,
+        tol=tol,
     )
     d, m = r_train.shape
     q = max(d, m)

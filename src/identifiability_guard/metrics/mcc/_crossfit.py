@@ -23,6 +23,7 @@ CorrelationMethod = Literal["pearson", "spearman"]
 @dataclass(frozen=True)
 class CrossfitMCCResult:
     """Result container for K-fold cross-fitted MCC."""
+
     score: float
     fold_scores: np.ndarray
     fold_sizes: np.ndarray
@@ -35,6 +36,7 @@ class CrossfitMCCResult:
 @dataclass(frozen=True)
 class NullCalibration:
     """Result of permutation null calibration for MCC."""
+
     null_scores: np.ndarray
     null_mean: float
     null_q95: float
@@ -100,7 +102,9 @@ def mcc_train_test_np(
 
 
 def make_kfold_splits(
-    n: int, n_splits: int = 5, seed: int = 0,
+    n: int,
+    n_splits: int = 5,
+    seed: int = 0,
 ) -> list:
     """Create K-fold train/test index splits."""
     if not 2 <= n_splits <= n // 3:
@@ -144,8 +148,12 @@ def mean_corr_coef_crossfit_np(
     fold_sizes = []
     for train_idx, test_idx in splits:
         score, _, _ = mcc_train_test_np(
-            x[train_idx], y[train_idx], x[test_idx], y[test_idx],
-            method=method, coverage_aware=coverage_aware,
+            x[train_idx],
+            y[train_idx],
+            x[test_idx],
+            y[test_idx],
+            method=method,
+            coverage_aware=coverage_aware,
         )
         fold_scores.append(score)
         fold_sizes.append(len(test_idx))
@@ -165,7 +173,10 @@ def mean_corr_coef_crossfit_np(
 
 
 def legacy_mcc_np(
-    x: np.ndarray, y: np.ndarray, *, method: CorrelationMethod = "pearson",
+    x: np.ndarray,
+    y: np.ndarray,
+    *,
+    method: CorrelationMethod = "pearson",
 ) -> float:
     """Legacy in-sample absolute MCC, retained for backward compatibility."""
     r = cross_correlation_np(x, y, method=method)
@@ -193,21 +204,35 @@ def permutation_null_np(
     """
     x = np.asarray(x, dtype=np.float64)
     y = np.asarray(y, dtype=np.float64)
+    if x.ndim != 2 or y.ndim != 2:
+        raise ValueError("x and y must be 2-D arrays")
+    if x.shape[0] != y.shape[0]:
+        raise ValueError("x and y must contain the same number of samples")
+    if metric not in ("crossfit", "legacy"):
+        raise ValueError("metric must be 'crossfit' or 'legacy'")
+    if isinstance(n_permutations, bool) or not isinstance(n_permutations, int):
+        raise TypeError("n_permutations must be an integer")
+    if n_permutations < 1:
+        raise ValueError("n_permutations must be at least 1")
+
     rng = np.random.default_rng(seed)
-    splits = make_kfold_splits(x.shape[0], n_splits=n_splits, seed=seed)
+    splits = None
+    if metric == "crossfit":
+        splits = make_kfold_splits(x.shape[0], n_splits=n_splits, seed=seed)
     null = np.empty(n_permutations, dtype=np.float64)
 
     for b in range(n_permutations):
         yp = y[rng.permutation(y.shape[0])]
         if metric == "crossfit":
             null[b] = mean_corr_coef_crossfit_np(
-                x, yp, method=method, splits=splits,
+                x,
+                yp,
+                method=method,
+                splits=splits,
                 coverage_aware=coverage_aware,
             ).score
         elif metric == "legacy":
             null[b] = legacy_mcc_np(x, yp, method=method)
-        else:
-            raise ValueError("metric must be 'crossfit' or 'legacy'")
 
     mu0 = float(np.mean(null))
     adjusted = None
