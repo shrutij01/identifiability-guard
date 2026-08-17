@@ -201,13 +201,15 @@ EXPERIMENTS = [
     # ── Exp 15: Phase diagram ──
     {
         "exp": "exp15",
-        "description": "Phase diagram: metric reliability under null encoder",
-        "d_values": [10],
-        "encoders": ["E9"],
-        "m_values": [5, 10, 20, 50, 100, 200],
-        "md_ratios": [0.5, 1.0, 2.0, 5.0, 10.0, 20.0],
-        "mn_ratios": [0.01, 0.05, 0.10, 0.50, 1.00, 5.00],
-        "notes": "6x6 heatmap. n = m/(m/n). Skip cells where n < 5.",
+        "description": "Phase diagram: metric reliability under null encoder (fixed m)",
+        "d_values": [100, 50, 25, 10, 5],
+        "encoders": ["E9", "E10"],
+        "m_values": [50],
+        "md_ratios": [0.5, 1.0, 2.0, 5.0, 10.0],
+        "mn_ratios": [0.01, 0.05, 0.10, 0.50, 1.00, 2.00, 5.00],
+        "notes": "5x7 heatmap. m=50 FIXED; rows vary d = m/(m/d), cols vary "
+                 "n = m/(m/n) — axes are independent knobs. Plus collapse "
+                 "sweep: d=10, m in {10,50,200}, n in {20..5000}.",
     },
 ]
 
@@ -308,25 +310,22 @@ def print_ratio_table():
 # ---------------------------------------------------------------------------
 
 def print_exp15_grid():
-    """Print the full exp15 phase diagram grid."""
-    md_ratios = [0.5, 1.0, 2.0, 5.0, 10.0, 20.0]
-    mn_ratios = [0.01, 0.05, 0.10, 0.50, 1.00, 5.00]
-    d = 10
+    """Print the full exp15 phase diagram grid (fixed-m design)."""
+    md_ratios = [0.5, 1.0, 2.0, 5.0, 10.0]
+    mn_ratios = [0.01, 0.05, 0.10, 0.50, 1.00, 2.00, 5.00]
+    m = 50  # fixed; rows vary d, columns vary n
 
-    print("\n\nExp15 Phase Diagram Grid (d=10, E9 null encoder)")
+    print("\n\nExp15 Phase Diagram Grid (m=50 fixed, E9/E10 null encoders)")
     print("=" * 70)
-    header = f"{'m/d':>6} {'m':>4}  " + "  ".join(f"{'m/n='+f'{mn:.2f}':>10}" for mn in mn_ratios)
+    header = f"{'m/d':>6} {'d':>4}  " + "  ".join(f"{'m/n='+f'{mn:.2f}':>10}" for mn in mn_ratios)
     print(header)
     print("-" * 70)
     for md in md_ratios:
-        m = int(md * d)
-        row = f"{md:>6.1f} {m:>4}  "
+        d = int(round(m / md))
+        row = f"{md:>6.1f} {d:>4}  "
         for mn in mn_ratios:
             n = int(round(m / mn))
-            if n < 5:
-                row += f"{'skip':>10}"
-            else:
-                row += f"{'n='+str(n):>10}"
+            row += f"{'n='+str(n):>10}"
         print(row)
     print()
 

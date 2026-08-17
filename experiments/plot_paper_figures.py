@@ -267,6 +267,16 @@ def _load_exp06a():
 EXP06_DGPS_MAIN = ["D1", "D3", "D4"]
 EXP06_MET_MAIN = ["dci_disentanglement", "mcc_pearson", "r2"]
 
+# DGP title symbol + colour, matching the taxonomy figure in the paper.
+# Free-factor DGPs (d_eff = d) are purple; single-constraint DGPs
+# (d_eff = d-1) are pink.
+EXP06_DGP_STYLE = {
+    "D1": {"symbol": r"$\mathbf{D}_{\perp}$", "color": "#2f1474"},  # independent
+    "D2": {"symbol": r"$\mathbf{D}_{\rho}$",  "color": "#9269c6"},  # correlated
+    "D3": {"symbol": r"$\mathbf{D}_{f}$",     "color": "#d0779f"},  # redundant
+    "D4": {"symbol": r"$\mathbf{D}_{F}$",     "color": "#d0779f"},  # synergistic
+}
+
 
 def plot_exp06a():
     """Dropped variables: 1×3 panels (D1, D3, D4), m/d on x-axis."""
@@ -295,7 +305,9 @@ def plot_exp06a():
             _style_ax(ax)
             ax.set_xlim(min(x_ratio) - 0.03, max(x_ratio) + 0.03)
             ax.set_xlabel(r"$\mathbf{m\,/\,d}$")
-            ax.set_title(f"$\\mathbf{{{dgp}}}$", fontsize=9)
+            st = EXP06_DGP_STYLE.get(
+                dgp, {"symbol": f"$\\mathbf{{{dgp}}}$", "color": "black"})
+            ax.set_title(st["symbol"], color=st["color"], fontsize=9)
         axes[0, 0].set_ylabel(r"$\boldsymbol{\mathcal{M}}(\cdot)$", fontweight="bold")
 
         _metric_legend(fig, metrics)
@@ -393,6 +405,13 @@ def plot_exp09():
 #   Heatmap grid:  one panel per metric
 #   rows = m/d,  cols = m/n,  colour = null-encoder score (should be 0)
 #   RdYlGn_r: green ≈ 0 (trustworthy), red > 0 (inflated)
+#
+#   Fixed-m design: m is held constant; rows vary d = m/(m/d) and columns
+#   vary n = m/(m/n), so the two ratio axes are independent knobs.
+#
+#   Collapse figure: null MCC-P over an (m, n) sweep at fixed d, plotted
+#   against m/n (no collapse) and against the extreme-value bound
+#   sqrt(2 log m / n_eff) (collapse), where n_eff is the test-split size.
 # ============================================================================
 
 
@@ -419,11 +438,16 @@ def _plot_phase_heatmap(grids, metrics, md_ratios, mn_ratios, encoder, stem):
     row_labels = [f"{md:.0f}" if md >= 1 else f"{md:.1f}" for md in md_ratios]
     col_labels = [f"{mn:.2f}" for mn in mn_ratios]
 
+    # NaN = metric not computable at this operating point (its own
+    # min-sample guard refuses the test split) — render as light grey
+    cmap = plt.get_cmap("RdYlGn_r").copy()
+    cmap.set_bad("0.88")
+
     im = None
     for idx, met in enumerate(metrics):
         ax = axes[idx]
         grid = np.asarray(grids.get(met, np.full((len(md_ratios), len(mn_ratios)), np.nan)))
-        im = ax.imshow(grid, cmap="RdYlGn_r", aspect="auto", vmin=0, vmax=1)
+        im = ax.imshow(grid, cmap=cmap, aspect="auto", vmin=0, vmax=1)
         ax.set_xticks(range(len(col_labels)))
         ax.set_xticklabels(col_labels, fontweight="bold")
         ax.set_yticks(range(len(row_labels)))
@@ -440,19 +464,146 @@ def _plot_phase_heatmap(grids, metrics, md_ratios, mn_ratios, encoder, stem):
     _save(fig, stem)
 
 
+def _plot_phase_heatmap_grid(grids, metrics, md_ratios, mn_ratios, encoder, stem,
+                             ncols=4):
+    """All-metric phase diagram: one heatmap per metric in an nrows x ncols grid.
+
+    Same colour scale / layout as ``_plot_phase_heatmap``, but titles are plain
+    bold text (not ``$\\mathbf{...}$``) so hyphens render as hyphens rather than
+    math minus, and the R^2 label — which already contains ``$...$`` — does not
+    produce nested math.
+    """
+    n = len(metrics)
+    nrows = math.ceil(n / ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols,
+        figsize=(2.6 * ncols + 0.5, 2.3 * nrows),
+        gridspec_kw={"wspace": 0.30, "hspace": 0.50,
+                     "left": 0.06, "right": 0.90,
+                     "top": 0.93, "bottom": 0.11},
+    )
+    axes = np.atleast_1d(axes).ravel()
+
+    row_labels = [f"{md:.0f}" if md >= 1 else f"{md:.1f}" for md in md_ratios]
+    col_labels = [f"{mn:.2f}" for mn in mn_ratios]
+
+    cmap = plt.get_cmap("RdYlGn_r").copy()
+    cmap.set_bad("0.88")  # NaN cells (metric's min-sample guard refused) = grey
+
+    im = None
+    for idx, met in enumerate(metrics):
+        ax = axes[idx]
+        grid = np.asarray(
+            grids.get(met, np.full((len(md_ratios), len(mn_ratios)), np.nan)))
+        im = ax.imshow(grid, cmap=cmap, aspect="auto", vmin=0, vmax=1)
+        ax.set_xticks(range(len(col_labels)))
+        ax.set_xticklabels(col_labels, fontsize=6)
+        ax.set_yticks(range(len(row_labels)))
+        ax.set_yticklabels(row_labels, fontsize=6)
+        if idx % ncols == 0:                       # left column
+            ax.set_ylabel(r"$\mathbf{m\,/\,d}$", fontsize=9)
+        if idx // ncols == nrows - 1:              # bottom row
+            ax.set_xlabel(r"$\mathbf{m\,/\,n}$", fontsize=9)
+        ax.set_title(MS[met]["label"], fontweight="bold", fontsize=9)
+
+    for j in range(n, len(axes)):                  # hide unused panels
+        axes[j].set_visible(False)
+
+    if im is not None:
+        cax = fig.add_axes([0.925, 0.12, 0.015, 0.78])
+        fig.colorbar(im, cax=cax)
+
+    _save(fig, stem)
+
+
 EXP15_MET_MAIN = ["mcc_pearson", "dci_disentanglement"]
+# All metrics, grouped: matching/correlation family (top row), then
+# regression / info-theoretic (bottom row). MIG/InfoM/T-MEX are sparse
+# (their min-sample guards leave many grey cells at small n).
+EXP15_MET_ALL = ["mcc_pearson", "mcc_spearman", "mcc_rdc", "dci_disentanglement",
+                 "r2", "mig", "infom", "tmex"]
+
+# Series colours for the collapse figure (one shade per m, MCC-P red family)
+EXP15_M_COLORS = ["#f1948a", "#c0392b", "#78281f"]
+EXP15_M_MARKERS = ["o", "s", "D"]
+
+
+def _plot_exp15_collapse(stem="exp15_mcc_collapse"):
+    """Two-panel collapse figure: null MCC-P vs m/n and vs the EVT bound."""
+    data, config = _try_load("exp15_collapse_e10")
+    if data is None:
+        print("  (no collapse results, skipping)")
+        return
+    config = config or {}  # results.npz can exist without its config.json sidecar
+    grids = data.get("grids", data)
+    obs = np.asarray(grids["mcc_pearson_mean"])
+    m_values = config.get("m_values", [10, 50, 200])
+    n_values = np.asarray(config.get("n_values",
+                                     [20, 50, 100, 200, 500, 1000, 2000, 5000]),
+                          dtype=float)
+    # Pipeline scores pure-statistic metrics on the held-out 20% split
+    n_eff = n_values - (0.8 * n_values).astype(int)
+
+    fig, axes = plt.subplots(
+        1, 2,
+        figsize=(3.2 * 2 + 0.6, 2.4),
+        gridspec_kw={"wspace": 0.28,
+                     "left": 0.09, "right": 0.98,
+                     "top": 0.88, "bottom": 0.19},
+    )
+
+    for i, m in enumerate(m_values):
+        kw = dict(color=EXP15_M_COLORS[i % len(EXP15_M_COLORS)],
+                  marker=EXP15_M_MARKERS[i % len(EXP15_M_MARKERS)],
+                  lw=1.3, ms=3.2, label=f"$m={m}$")
+        axes[0].plot(m / n_values, obs[i], **kw)
+        axes[1].plot(np.sqrt(2 * np.log(m) / n_eff), obs[i], **kw)
+
+    xs = np.linspace(0, 1.75, 200)
+    axes[1].plot(xs, np.minimum(xs, 1.0), ls="--", lw=1.0, color="0.45",
+                 zorder=1, label=r"$\min(x,\,1)$")
+
+    axes[0].set_xscale("log")
+    axes[0].set_xlabel(r"$\mathbf{m\,/\,n}$", fontsize=11)
+    axes[0].set_title("no collapse in $m/n$", fontsize=10)
+    axes[1].set_xlabel(r"$\mathbf{\sqrt{2\log m \,/\, n_{\rm eff}}}$", fontsize=11)
+    axes[1].set_title(r"collapse in $\sqrt{2\log m / n_{\rm eff}}$", fontsize=10)
+    axes[0].set_ylabel("Null MCC-P score", fontsize=10)
+
+    for ax in axes:
+        _style_ax(ax)
+    axes[1].legend(frameon=True, fancybox=False, edgecolor="0.85",
+                   fontsize=7.5, loc="lower right", handletextpad=0.35)
+
+    _save(fig, stem)
 
 
 def plot_exp15():
-    """Phase diagram for E10 (main text only)."""
-    print("\n=== exp15: phase diagram (E10) ===")
-    grids, config = _load_exp15("exp15_e10")
-    if grids is None:
-        return
-    md_ratios = config.get("md_ratios", [0.5, 1.0, 2.0, 5.0, 10.0, 20.0])
-    mn_ratios = config.get("mn_ratios", [0.01, 0.05, 0.10, 0.50, 1.00, 5.00])
-    _plot_phase_heatmap(grids, EXP15_MET_MAIN, md_ratios, mn_ratios,
-                        "E10", "exp15_phase_diagram_e10_main")
+    """Phase diagrams (E10 main, E9 appendix) + MCC collapse figure."""
+    for enc_key, enc, stem in [
+        ("exp15_e10", "E10", "exp15_phase_diagram_e10_main"),
+        ("exp15_e9", "E9", "exp15_phase_diagram_e9_apx"),
+    ]:
+        print(f"\n=== exp15: phase diagram ({enc}) ===")
+        grids, config = _load_exp15(enc_key)
+        if grids is None:
+            continue
+        if not config or "m_fixed" not in config:
+            print(f"  ({enc_key} results predate the fixed-m redesign — "
+                  "stale, skipping; re-run exp15_phase_diagram.py)")
+            continue
+        md_ratios = config.get("md_ratios", [0.5, 1.0, 2.0, 5.0, 10.0])
+        mn_ratios = config.get("mn_ratios", [0.01, 0.05, 0.10, 0.50, 1.00])
+        _plot_phase_heatmap(grids, EXP15_MET_MAIN, md_ratios, mn_ratios,
+                            enc, stem)
+        # All-metric grid (appendix): shows which metrics share MCC's
+        # m/n-driven inflation and which stay flat (R^2, MIG).
+        _plot_phase_heatmap_grid(
+            grids, EXP15_MET_ALL, md_ratios, mn_ratios, enc,
+            f"exp15_phase_diagram_{enc.lower()}_allmetrics")
+
+    print("\n=== exp15: MCC collapse ===")
+    _plot_exp15_collapse()
 
 
 # ============================================================================
