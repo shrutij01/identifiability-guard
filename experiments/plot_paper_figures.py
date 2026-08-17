@@ -267,6 +267,16 @@ def _load_exp06a():
 EXP06_DGPS_MAIN = ["D1", "D3", "D4"]
 EXP06_MET_MAIN = ["dci_disentanglement", "mcc_pearson", "r2"]
 
+# DGP title symbol + colour, matching the taxonomy figure in the paper.
+# Free-factor DGPs (d_eff = d) are purple; single-constraint DGPs
+# (d_eff = d-1) are pink.
+EXP06_DGP_STYLE = {
+    "D1": {"symbol": r"$\mathbf{D}_{\perp}$", "color": "#2f1474"},  # independent
+    "D2": {"symbol": r"$\mathbf{D}_{\rho}$",  "color": "#9269c6"},  # correlated
+    "D3": {"symbol": r"$\mathbf{D}_{f}$",     "color": "#d0779f"},  # redundant
+    "D4": {"symbol": r"$\mathbf{D}_{F}$",     "color": "#d0779f"},  # synergistic
+}
+
 
 def plot_exp06a():
     """Dropped variables: 1×3 panels (D1, D3, D4), m/d on x-axis."""
@@ -295,7 +305,9 @@ def plot_exp06a():
             _style_ax(ax)
             ax.set_xlim(min(x_ratio) - 0.03, max(x_ratio) + 0.03)
             ax.set_xlabel(r"$\mathbf{m\,/\,d}$")
-            ax.set_title(f"$\\mathbf{{{dgp}}}$", fontsize=9)
+            st = EXP06_DGP_STYLE.get(
+                dgp, {"symbol": f"$\\mathbf{{{dgp}}}$", "color": "black"})
+            ax.set_title(st["symbol"], color=st["color"], fontsize=9)
         axes[0, 0].set_ylabel(r"$\boldsymbol{\mathcal{M}}(\cdot)$", fontweight="bold")
 
         _metric_legend(fig, metrics)
@@ -452,7 +464,64 @@ def _plot_phase_heatmap(grids, metrics, md_ratios, mn_ratios, encoder, stem):
     _save(fig, stem)
 
 
+def _plot_phase_heatmap_grid(grids, metrics, md_ratios, mn_ratios, encoder, stem,
+                             ncols=4):
+    """All-metric phase diagram: one heatmap per metric in an nrows x ncols grid.
+
+    Same colour scale / layout as ``_plot_phase_heatmap``, but titles are plain
+    bold text (not ``$\\mathbf{...}$``) so hyphens render as hyphens rather than
+    math minus, and the R^2 label — which already contains ``$...$`` — does not
+    produce nested math.
+    """
+    n = len(metrics)
+    nrows = math.ceil(n / ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols,
+        figsize=(2.6 * ncols + 0.5, 2.3 * nrows),
+        gridspec_kw={"wspace": 0.30, "hspace": 0.50,
+                     "left": 0.06, "right": 0.90,
+                     "top": 0.93, "bottom": 0.11},
+    )
+    axes = np.atleast_1d(axes).ravel()
+
+    row_labels = [f"{md:.0f}" if md >= 1 else f"{md:.1f}" for md in md_ratios]
+    col_labels = [f"{mn:.2f}" for mn in mn_ratios]
+
+    cmap = plt.get_cmap("RdYlGn_r").copy()
+    cmap.set_bad("0.88")  # NaN cells (metric's min-sample guard refused) = grey
+
+    im = None
+    for idx, met in enumerate(metrics):
+        ax = axes[idx]
+        grid = np.asarray(
+            grids.get(met, np.full((len(md_ratios), len(mn_ratios)), np.nan)))
+        im = ax.imshow(grid, cmap=cmap, aspect="auto", vmin=0, vmax=1)
+        ax.set_xticks(range(len(col_labels)))
+        ax.set_xticklabels(col_labels, fontsize=6)
+        ax.set_yticks(range(len(row_labels)))
+        ax.set_yticklabels(row_labels, fontsize=6)
+        if idx % ncols == 0:                       # left column
+            ax.set_ylabel(r"$\mathbf{m\,/\,d}$", fontsize=9)
+        if idx // ncols == nrows - 1:              # bottom row
+            ax.set_xlabel(r"$\mathbf{m\,/\,n}$", fontsize=9)
+        ax.set_title(MS[met]["label"], fontweight="bold", fontsize=9)
+
+    for j in range(n, len(axes)):                  # hide unused panels
+        axes[j].set_visible(False)
+
+    if im is not None:
+        cax = fig.add_axes([0.925, 0.12, 0.015, 0.78])
+        fig.colorbar(im, cax=cax)
+
+    _save(fig, stem)
+
+
 EXP15_MET_MAIN = ["mcc_pearson", "dci_disentanglement"]
+# All metrics, grouped: matching/correlation family (top row), then
+# regression / info-theoretic (bottom row). MIG/InfoM/T-MEX are sparse
+# (their min-sample guards leave many grey cells at small n).
+EXP15_MET_ALL = ["mcc_pearson", "mcc_spearman", "mcc_rdc", "dci_disentanglement",
+                 "r2", "mig", "infom", "tmex"]
 
 # Series colours for the collapse figure (one shade per m, MCC-P red family)
 EXP15_M_COLORS = ["#f1948a", "#c0392b", "#78281f"]
@@ -527,6 +596,11 @@ def plot_exp15():
         mn_ratios = config.get("mn_ratios", [0.01, 0.05, 0.10, 0.50, 1.00])
         _plot_phase_heatmap(grids, EXP15_MET_MAIN, md_ratios, mn_ratios,
                             enc, stem)
+        # All-metric grid (appendix): shows which metrics share MCC's
+        # m/n-driven inflation and which stay flat (R^2, MIG).
+        _plot_phase_heatmap_grid(
+            grids, EXP15_MET_ALL, md_ratios, mn_ratios, enc,
+            f"exp15_phase_diagram_{enc.lower()}_allmetrics")
 
     print("\n=== exp15: MCC collapse ===")
     _plot_exp15_collapse()
