@@ -2,7 +2,7 @@
 
 Benchmark framework for stress-testing identifiability metrics. Generate controlled ground-truth factors, transform them in specific ways, and measure whether standard metrics correctly detect recovery.
 
-Companion code for [*Who Guards the Guardians? The Challenges of Evaluating Identifiability of Learned Representations*](https://arxiv.org/abs/2602.24278).
+Companion code for [*Who Guards the Guardians? The Challenges of Evaluating Identifiability of Learned Representations*](https://proceedings.mlr.press/v337/joshi26a.html).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -137,15 +137,25 @@ docs/            # Documentation
 ## Citation
 
 ```bibtex
-@software{identifiability_guard,
-  title = {Identifiability Guard},
-  author = {Joshi, Shruti and Saulus, Th\'eo and Brendel, Wieland and Brouillard, Philippe and Sridhar, Dhanya and Reizinger, Patrik},
+@InProceedings{pmlr-v337-joshi26a,
+  title = {Who Guards the Guardians? {The} Challenges of Evaluating Identifiability of Learned Representations},
+  author = {Joshi, Shruti and Saulus, Th\'{e}o and Brendel, Wieland and Brouillard, Philippe and Sridhar, Dhanya and Reizinger, Patrik},
+  booktitle = {Proceedings of the 42nd Conference on Uncertainty in Artificial Intelligence},
+  pages = {2618--2660},
   year = {2026},
-  url = {https://github.com/shrutij01/identifiability-guard}
+  editor = {Perković, Emilija and Malinsky, Daniel},
+  volume = {337},
+  series = {Proceedings of Machine Learning Research},
+  month = {17--21 Aug},
+  publisher = {PMLR},
+  pdf = {https://raw.githubusercontent.com/mlresearch/v337/main/assets/joshi26a/joshi26a.pdf},
+  url = {https://proceedings.mlr.press/v337/joshi26a.html},
+  abstract = {Identifiability in representation learning is commonly evaluated using standard metrics (e.g., *MCC, $R^2$, DCI*) on synthetic benchmarks with known ground-truth factors. These metrics are assumed to reflect recovery up to the equivalence class guaranteed by identifiability theory. We show that this assumption holds only under specific structural conditions: each metric implicitly encodes assumptions about both the data-generating process ({DGP}) and the encoder. When these assumptions are violated, metrics become misspecified and can produce systematic false positives and false negatives. Such failures occur both within classical identifiability regimes and in post-hoc settings where identifiability is most needed. We introduce a taxonomy separating {DGP} assumptions from encoder geometry, use it to characterise the validity domains of existing metrics, and release an evaluation suite for reproducible stress testing and comparison.}
 }
 ```
 
-For the accompanying paper citation, see [`CITATION.cff`](CITATION.cff).
+The same paper citation is available in machine-readable form in
+[`CITATION.cff`](CITATION.cff).
 
 ## License
 

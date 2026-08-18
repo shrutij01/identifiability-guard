@@ -38,7 +38,7 @@ dependencies = [
 ]
 
 [project.urls]
-Paper = "https://arxiv.org/abs/2602.24278"
+Paper = "https://proceedings.mlr.press/v337/joshi26a.html"
 Repository = "https://github.com/shrutij01/identifiability-guard"
 Documentation = "https://shrutij01.github.io/identifiability-guard/"
 

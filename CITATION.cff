@@ -5,7 +5,7 @@ type: software
 version: 0.1.0
 license: MIT
 repository-code: "https://github.com/shrutij01/identifiability-guard"
-url: "https://arxiv.org/abs/2602.24278"
+url: "https://proceedings.mlr.press/v337/joshi26a.html"
 authors:
   - family-names: Joshi
     given-names: Shruti
@@ -20,7 +20,7 @@ authors:
   - family-names: Reizinger
     given-names: Patrik
 preferred-citation:
-  type: article
+  type: conference-paper
   title: "Who Guards the Guardians? The Challenges of Evaluating Identifiability of Learned Representations"
   authors:
     - family-names: Joshi
@@ -35,5 +35,22 @@ preferred-citation:
       given-names: Dhanya
     - family-names: Reizinger
       given-names: Patrik
+  editors:
+    - family-names: Perković
+      given-names: Emilija
+    - family-names: Malinsky
+      given-names: Daniel
+  collection-title: "Proceedings of the 42nd Conference on Uncertainty in Artificial Intelligence"
+  collection-type: proceedings
+  conference:
+    name: "42nd Conference on Uncertainty in Artificial Intelligence"
+    date-start: "2026-08-17"
+    date-end: "2026-08-21"
+  date-published: "2026-08-17"
+  start: 2618
+  end: 2660
+  volume: 337
+  publisher:
+    name: PMLR
   year: 2026
-  url: "https://arxiv.org/abs/2602.24278"
+  url: "https://proceedings.mlr.press/v337/joshi26a.html"
