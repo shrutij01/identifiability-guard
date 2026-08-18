@@ -81,6 +81,7 @@ celerybeat-schedule
 # Environments
 .env
 .venv
+.venv-manim/
 env/
 venv/
 ENV/
@@ -118,6 +119,9 @@ context_*
 AUDIT.md
 experiments/logs
 experiments/generated_jobs
+/animations/
+/media/
+/manim.cfg
 
 # Local experiment artifacts and internal drafts
 runs/
@@ -128,3 +132,9 @@ HANDOFF_*.md
 uai-review*
 uai-rebuttal.md
 experiments/*-expts.md
+
+# Local Overleaf exports
+/unsup_overcomplete_evals*/
+/unsup_overcomplete_evals*.zip
+/uai2026-template*.tex
+/temp-taxonomy.tex
