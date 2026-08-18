@@ -1,0 +1,122 @@
+/* Custom bomb color theme enhancements */
+
+:root {
+  /* Vibrant accent colors */
+  --md-accent-fg-color: #ff0080;
+  --md-accent-bg-color: #ff008010;
+}
+
+/* Code blocks with gradient border */
+.highlight pre {
+  border-left: 4px solid;
+  border-image: linear-gradient(180deg, #ff0080, #7928ca, #00d4ff) 1;
+  box-shadow: 0 4px 12px rgba(121, 40, 202, 0.15);
+}
+
+/* Inline code with subtle background */
+code:not(.highlight code) {
+  background: linear-gradient(90deg, rgba(255, 0, 128, 0.1), rgba(0, 212, 255, 0.1));
+  border-radius: 4px;
+  padding: 0.2em 0.4em;
+  font-weight: 500;
+}
+
+/* Links with gradient hover effect */
+.md-typeset a {
+  background: linear-gradient(90deg, #ff0080, #7928ca);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.md-typeset a:hover {
+  background: linear-gradient(90deg, #7928ca, #00d4ff);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+/* Header navigation with gradient underline */
+.md-tabs__link--active {
+  border-bottom: 2px solid;
+  border-image: linear-gradient(90deg, #ff0080, #7928ca, #00d4ff) 1;
+}
+
+/* Search bar glow effect */
+.md-search__input:focus {
+  box-shadow: 0 0 0 2px rgba(255, 0, 128, 0.3),
+              0 0 12px rgba(121, 40, 202, 0.4);
+}
+
+/* Admonition blocks with custom colors */
+.md-typeset .admonition.tip {
+  border-left-color: #00d4ff;
+}
+
+.md-typeset .admonition.warning {
+  border-left-color: #ff0080;
+}
+
+.md-typeset .admonition.note {
+  border-left-color: #7928ca;
+}
+
+/* Button styling */
+.md-button {
+  background: linear-gradient(135deg, #ff0080, #7928ca);
+  border: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.md-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(121, 40, 202, 0.4);
+}
+
+/* Table headers with gradient */
+.md-typeset table:not([class]) th {
+  background: linear-gradient(135deg, rgba(255, 0, 128, 0.1), rgba(121, 40, 202, 0.1));
+  font-weight: 600;
+}
+
+/* Dark mode specific enhancements */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #7928ca;
+  --md-accent-fg-color: #00d4ff;
+}
+
+[data-md-color-scheme="slate"] code:not(.highlight code) {
+  background: linear-gradient(90deg, rgba(255, 0, 128, 0.15), rgba(0, 212, 255, 0.15));
+  color: #00d4ff;
+}
+
+[data-md-color-scheme="slate"] .highlight pre {
+  background: #1a1a2e;
+  border-image: linear-gradient(180deg, #00d4ff, #7928ca, #ff0080) 1;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom badge styles for metrics */
+.md-typeset .badge {
+  display: inline-block;
+  padding: 0.25em 0.6em;
+  font-size: 0.85em;
+  font-weight: 600;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff0080, #7928ca);
+  color: white;
+}
+
+/* Equation highlighting */
+.MathJax {
+  color: #7928ca !important;
+}
+
+[data-md-color-scheme="slate"] .MathJax {
+  color: #00d4ff !important;
+}
