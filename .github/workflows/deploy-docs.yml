@@ -33,4 +33,4 @@ jobs:
 
       - name: Build and deploy docs
         run: |
-          mkdocs gh-deploy --force
+          mkdocs gh-deploy --force --no-history --strict

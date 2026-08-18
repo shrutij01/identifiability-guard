@@ -5,7 +5,7 @@ Benchmark framework for stress-testing identifiability metrics. Generate control
 Companion code for [*Who Guards the Guardians? The Challenges of Evaluating Identifiability of Learned Representations*](https://proceedings.mlr.press/v337/joshi26a.html).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.8.1+](https://img.shields.io/badge/python-3.8.1+-blue.svg)](https://www.python.org/downloads/)
 
 ## What This Does
 
